@@ -289,11 +289,15 @@ table.lq td:nth-child(3):not(.n){font-size:11px;max-width:54px;word-break:break-
 
 table.lq td.cat{overflow:hidden;overflow-wrap:anywhere;word-break:break-all;line-height:1.35}
 @media(max-width:520px){table.lq td.cat{width:46px}}
+
+.mwrap{min-width:min(100%,420px)}
+.kpis.k2{grid-template-columns:1fr 1fr;margin-bottom:10px}
+@media(max-width:700px){.kpis.k2{grid-template-columns:1fr}}
 </style></head>
 <body><div id="app"><div style="padding:40vh 0;text-align:center;color:#7a7166">불러오는 중…</div></div>
 <script src="firebase-config.js"></script>
 <script>const isPhone=()=>Math.min(innerWidth,(window.screen&&screen.width)||innerWidth)<=700; // 넓은 표가 그려지는 순간 innerWidth가 잠깐 커지는 기기가 있어 화면 크기도 함께 본다
-const APP_VER='31'; // 빌드할 때 sw.js의 캐시 번호와 같은 숫자로 채워짐
+const APP_VER='32'; // 빌드할 때 sw.js의 캐시 번호와 같은 숫자로 채워짐
 'use strict';
 const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -897,10 +901,9 @@ const Log={
 const fs=splitPairs(allFields(sid).filter(f=>f.m)).map(f=>f.ty==='pnum'&&f.base.ty==='calcpair'?{...f,ms:f.i?'고객수':'테이블'}:f);const td=today();const mores=allFields(sid).filter(f=>f.more);const cells=[...mores,{k:'notes',l:'특이사항'}];
     const days=[...Array(n)].map((_,i)=>`${ym}-${pad(i+1)}`);const ds=days.map(x=>docs['daily_'+x]||{});
     const kp=fs.filter(f=>f.k==='total'||f.k==='net');
-    body.innerHTML=`<div class="kpis" style="grid-template-columns:1fr;max-width:340px;margin-inline:auto">${kp.map(f=>`<div class="kpi"><span>${esc(f.l)} 월 합계</span><b>${this.sumCell(f,ds)||'-'}</b></div>`).join('')}</div>
-    <div class="muted" style="margin:8px 2px">날짜를 누르면 그날 일지로 이동하고, 특이사항${sid==='bojagi'?', 일일업무':''} 칸을 누르면 전체 내용이 창으로 뜹니다.</div><div class="tw fit"><table class="t nw"><thead><tr><th class="st">날짜</th>${fs.map(f=>`<th ${f.ms?'style="width:76px;min-width:76px"':''}>${esc(f.ms||f.l)}</th>`).join('')}${cells.map(f=>`<th>${esc(f.l)}</th>`).join('')}</tr></thead><tbody>
+    body.innerHTML=`<div class="fitwrap mwrap"><div class="kpis k2">${kp.map(f=>`<div class="kpi"><span>${esc(f.l)} 월 합계</span><b>${this.sumCell(f,ds)||'-'}</b></div>`).join('')}</div><div class="tw fit" style="display:block"><table class="t nw"><thead><tr><th class="st">날짜</th>${fs.map(f=>`<th ${f.ms?'style="width:76px;min-width:76px"':''}>${esc(f.ms||f.l)}</th>`).join('')}${cells.map(f=>`<th>${esc(f.l)}</th>`).join('')}</tr></thead><tbody>
     ${days.map((x,i)=>`<tr class="${x===td?'todayrow':''}"><td data-go="${x}" style="cursor:pointer;text-decoration:underline" class="st wk${dowOf(x)} ${x===td?'today':''}">${+x.slice(8)}일 (${DOW[dowOf(x)]})</td>${fs.map(f=>`<td class="${f.ty==='people'?'':'n'}">${esc(ftext(f,ds[i]))}</td>`).join('')}${cells.map(f=>`<td class="txt clip" data-note="${x}" data-nk="${f.k}" style="cursor:pointer;${f.k==='notes'?(mores.length?'min-width:240px;max-width:400px':''):'min-width:80px;max-width:130px'}"><div style="max-height:40px">${esc(String(ds[i][f.k]||'').slice(0,80))}</div>${ds[i][f.k]?'<div class="more">전체 보기</div>':''}</td>`).join('')}</tr>`).join('')}
-    <tr class="tot"><td class="st tot">합계</td>${fs.map(f=>`<td class="n">${this.sumCell(f,ds)}</td>`).join('')}${cells.map(()=>'<td></td>').join('')}</tr></tbody></table></div>`;
+    <tr class="tot"><td class="st tot">합계</td>${fs.map(f=>`<td class="n">${this.sumCell(f,ds)}</td>`).join('')}${cells.map(()=>'<td></td>').join('')}</tr></tbody></table></div></div><div class="muted" style="margin:8px 2px;text-align:center">날짜를 누르면 그날 일지로 이동하고, 특이사항${sid==='bojagi'?', 일일업무':''} 칸을 누르면 전체 내용이 창으로 뜹니다.</div>`;
     $$('[data-go]',body).forEach(h=>h.onclick=()=>{S.date=h.dataset.go;S.view='day';renderView();});this.bindNotes(body);
   },
   bindNotes(body){$$('[data-note]',body).forEach(c=>c.onclick=()=>this.noteModal(c.dataset.note,c.dataset.nk||'notes'));},
