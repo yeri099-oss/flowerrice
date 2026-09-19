@@ -138,6 +138,14 @@ table.t tr.click:hover td{background:#fffbea}
 @media print{header.top,.fab,.editbar,.bar{display:none}}
 
 .brandmark{display:flex;flex-direction:column;align-items:center;gap:6px;margin:6px 0 20px}.brandmark h1{font-size:26px;margin:0;letter-spacing:-.5px}.brandmark img{display:block}
+
+.pairs{display:grid;grid-template-columns:minmax(64px,auto) 1fr 1fr;gap:8px 10px;align-items:center}
+.pairs .ph{font-size:12px;color:var(--sub);text-align:right;padding-right:10px}
+.pairs .pl{font-weight:700}
+.pairs input{width:100%;border:1px solid var(--line);border-radius:9px;padding:9px 10px;text-align:right;background:#fff}
+.pairs .pv{text-align:right;font-weight:600;font-variant-numeric:tabular-nums;padding:6px 10px}
+.pairs .ro{min-height:0}
+@media(max-width:1024px){.tw{max-height:none!important;overflow-y:visible}table.t thead th{position:static}table.t thead th.st{position:sticky}}
 </style></head>
 <body><div id="app"><div style="padding:40vh 0;text-align:center;color:#7a7166">불러오는 중…</div></div>
 <script src="firebase-config.js"></script>
@@ -426,7 +434,7 @@ function renderMain(){clearAll();
   if(!S.store||(!stores.includes(S.store)&&!['_admin','_hist'].includes(S.store)))S.store=stores[0]||(DB.me.role==='admin'?'_admin':null);
   if(!S.store){root().innerHTML=`<div class="login card"><h2>사업장 미배치</h2><p>아직 사업장에 배치되지 않았습니다. 관리자에게 문의해 주세요.</p><button class="btn ghost" id="lo">로그아웃</button></div>`;$('#lo').onclick=()=>DB.logout();return;}
   root().innerHTML=`<header class="top"><div class="brand"><h1>꽃밥이야기<small id="stSub"></small></h1>
-    <div class="who"><span class="tag ${DB.me.role==='admin'?'a':DB.me.role==='exec'?'e':'r'}">${ROLE_L[DB.me.role]}</span><b>${esc(DB.me.name)}</b><button class="ibtn" id="menuBtn">☰</button></div></div>
+    <div class="who"><b>${esc(DB.me.name)}</b><button class="ibtn" id="menuBtn">☰</button></div></div>
     <nav class="tabs" id="storeTabs"></nav></header><div id="subTabs" class="subtabs"></div><main id="view"></main><div id="floats"></div>`;
   $('#menuBtn').onclick=()=>modal(`<h2>${esc(DB.me.name)}</h2><div style="display:grid;gap:8px"><button class="btn ghost" id="mPw">비밀번호 변경</button><button class="btn ghost" id="mInst">휴대폰에 앱으로 설치하는 방법</button><button class="btn bad" id="mOut">로그아웃</button></div><div class="row"><button class="btn ghost" data-close>닫기</button></div>`,(m,close)=>{
     $('#mPw',m).onclick=()=>{close();pwForm(false);};$('#mOut',m).onclick=()=>{close();DB.logout();};
@@ -457,6 +465,9 @@ function renderView(){clearView();const v=$('#view');$('#floats').innerHTML='';v
   renderFloats();
 }
 // 누르는 순간 바로 반응하게 함 (입력 중 키보드가 내려가며 화면이 밀려 첫 터치가 빗나가는 문제 방지)
+// 기록하기/완료로 화면이 바뀌어도 보던 위치를 유지
+function keepPlace(){const els=$$('#view .card, #view .item');let idx=-1,off=0;for(let i=0;i<els.length;i++){const r=els[i].getBoundingClientRect();if(r.bottom>80){idx=i;off=r.top;break;}}const y=scrollY;let n=0;
+  const tick=()=>{const now=$$('#view .card, #view .item');if(idx>=0&&now[idx]){const r=now[idx].getBoundingClientRect();scrollTo(0,scrollY+r.top-off);if(n<6){n++;setTimeout(tick,60);}return;}if(n++<30)setTimeout(tick,40);else scrollTo(0,y);};setTimeout(tick,0);}
 let _ghostUntil=0;['click','mousedown','mouseup'].forEach(t=>document.addEventListener(t,e=>{if(e.isTrusted&&Date.now()<_ghostUntil){if(t==='click')_ghostUntil=0;e.stopPropagation();e.preventDefault();}},true));
 function tap(el,fn){let running=false;const run=async e=>{if(e.type==='pointerdown'){if(e.button>0)return;if(e.cancelable)e.preventDefault();if(e.pointerType!=='mouse')_ghostUntil=Date.now()+350;}if(running)return;running=true;try{await fn();}finally{running=false;}};el.addEventListener('pointerdown',run);el.addEventListener('click',run);}
 function pickDay(title,days,docsHas,extra){return new Promise(res=>{const td=today();modal(`<h2>${title}</h2><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(${days.length>7?'64':'120'}px,1fr));gap:6px">${days.map(d=>`<button class="ibtn" data-d="${d}" style="padding:10px 4px;${d===td?'border-color:var(--acc);background:var(--acc2);':''}${d>td?'opacity:.45;':''}"><b>${+d.slice(8)}일</b> <span class="wk${dowOf(d)}" style="font-size:12px">${DOW[dowOf(d)]}</span>${docsHas&&docsHas(d)?'<div style="font-size:11px;color:var(--ok)">기록 있음</div>':'<div style="font-size:11px;color:var(--sub)">&nbsp;</div>'}</button>`).join('')}</div>${extra||''}<div class="row"><button class="btn ghost" data-close id="pdX">취소</button></div>`,(m,close)=>{$$('[data-d]',m).forEach(b=>b.onclick=()=>{close();res(b.dataset.d);});const ex=$('#pdExtra',m);if(ex)ex.onclick=()=>{close();res('__extra');};$('#pdX',m).onclick=()=>{close();res(null);};});});}
@@ -468,9 +479,9 @@ function renderFloats(){const f=$('#floats');if(!f)return;if(!STORES[S.store]||!
         const d=await pickDay('어느 날짜를 기록할까요?',days,x=>{const dc=Log.docs&&Log.docs['daily_'+x];return dc&&Object.keys(dc).some(k=>!k.startsWith('_')&&k!=='writers');});if(!d)return;S.ret=S.view;S.date=d;S.view='day';}
       else if((S.tab==='stock'||S.tab==='chae')&&S.stockView!=='entry'&&S.stockView!=='memo'){const canCarry=DB.me.role==='admin'||!Stock.prev;
         const d=await pickDay('어느 날짜를 기록할까요?',monthDays(ymOf(S.date)),null,canCarry&&S.stockView==='table'?'<div style="margin-top:12px"><button class="btn ghost sm" id="pdExtra">날짜 대신 전월 이월 수량을 직접 수정</button></div>':'');if(!d)return;if(d!=='__extra'){S.ret2=S.stockView;S.date=d;S.stockView='entry';}}
-      S.edit=true;renderView();});}
+      const stay=!S.ret&&!S.ret2;if(stay)keepPlace();S.edit=true;renderView();});}
   else{f.innerHTML=`<div class="editbar"><div class="msg">기록 중입니다. 입력하면 자동으로 저장됩니다. <span id="saveSt" class="savest"></span></div><button class="btn acc" id="doneEdit" style="padding:12px 22px;font-size:16px">완료</button></div>`;
-    tap($('#doneEdit'),async()=>{if(document.activeElement&&document.activeElement.blur)document.activeElement.blur();await Saver.flush(true);S.edit=false;DB.endSession();if(S.ret){S.view=S.ret;S.ret=null;}if(S.ret2){S.stockView=S.ret2;S.ret2=null;}toast('저장되었습니다.');renderView();});Saver.set(Saver.state==='saved'?'saved':'');}
+    tap($('#doneEdit'),async()=>{if(document.activeElement&&document.activeElement.blur)document.activeElement.blur();await Saver.flush(true);S.edit=false;DB.endSession();const back=S.ret||S.ret2;if(S.ret){S.view=S.ret;S.ret=null;}if(S.ret2){S.stockView=S.ret2;S.ret2=null;}if(!back)keepPlace();toast('저장되었습니다.');renderView();});Saver.set(Saver.state==='saved'?'saved':'');}
 }
 function sumExpr(raw){const s=String(raw??'').replace(/[,\s]/g,'');if(s==='')return null;if(/^-?\d+(\.\d+)?([+\-]\d+(\.\d+)?)*$/.test(s)){return s.match(/[+\-]?\d+(\.\d+)?/g).reduce((a,b)=>a+Number(b),0);}return null;}
 function dateNav(unit){ // unit: day|week|month
@@ -525,13 +536,16 @@ function logSchema(sid){
 const CHECKS={secs:[['am','점검항목 (오전)'],['pm','점검항목 (오후)'],['mg','점검항목 (관리자)']],items:['워크인/쇼케이스 온도확인 (0~10℃)','청소 (어느 곳이든 10분간)','유통기한 확인 (냉장 필수)','정육 유통기한 확인'],
   note:'유통기한 점검 자리: 1)세제 2)꿀 3)초콜릿 4)평대냉동고 5)인스턴트커피 6)과자 7)우유 8)탄산수 9)김치'};
 const allFields=sid=>logSchema(sid).flatMap(s=>s.fields);
+// 테이블;고객수 한 쌍을 표에서는 두 줄(두 칸)로 나눠 보여 준다
+const splitPairs=fs=>fs.flatMap(f=>(f.ty==='pair'||f.ty==='calcpair')?[{k:f.k+'#T',l:f.l+' 테이블',ty:'pnum',base:f,i:0,m:f.m},{k:f.k+'#G',l:f.l+' 고객수',ty:'pnum',base:f,i:1,m:f.m}]:[f]);
 function fval(f,d){ // 표시용 값
+  if(f.ty==='pnum'){const v=fval(f.base,d);return v?v[f.i]:null;}
   if(f.ty==='calc'||f.ty==='calcpair')return f.fn(d);
   if(f.ty==='pair')return has(d,f.k+'T',f.k+'G')?[d[f.k+'T'],d[f.k+'G']]:null;
   return getPath(d,f.k);
 }
 function ftext(f,d){const v=fval(f,d);if(v==null||v==='')return'';
-  switch(f.ty){case'money':case'int':case'calc':return won(v);case'pair':case'calcpair':return `${won(v[0])||0} ; ${won(v[1])||0}`;
+  switch(f.ty){case'money':case'int':case'calc':case'pnum':return won(v);case'pair':case'calcpair':return `테이블 ${won(v[0])||0}, 고객 ${won(v[1])||0}`;
     case'people':return v.join(', ');case'peopleMemo':return v.map(p=>p.m?`${p.n}(${p.m})`:p.n).join(', ');case'workers':return v.map(p=>p.t?`${p.n}(${p.t})`:p.n).join(', ');default:return String(v);}
 }
 const Log={
@@ -554,14 +568,16 @@ const Log={
   meta(d){return d&&d._byName?`<div class="muted" style="margin:4px 2px">마지막 기록: ${esc(d._byName)} · ${fmtTs(d._at)}</div>`:'';},
   put(k,val){Saver.put(this.sid,'daily_'+S.date,k,val);setPath(this.doc,k,val);this.recalc();},
   recalc(){const d=this.doc;$$('[data-calc]',this.v).forEach(el=>{const f=this.fmap[el.dataset.calc];el.textContent=ftext(f,d)||'-';});},
-  drawDay(){const sid=this.sid,d=this.doc,body=$('#logBody',this.v);const secs=logSchema(sid);this.fmap={};secs.forEach(s=>s.fields.forEach(f=>this.fmap[f.k]=f));
+  drawDay(){const sid=this.sid,d=this.doc,body=$('#logBody',this.v);const secs=logSchema(sid);this.fmap={};secs.forEach(s=>[...s.fields,...splitPairs(s.fields)].forEach(f=>this.fmap[f.k]=f));
     if(S.edit&&this.built){ // 기록 중: 입력 중인 칸은 건드리지 않고 나머지만 갱신
       $$('[data-k]',body).forEach(el=>{if(el===document.activeElement)return;const k=el.dataset.k;if(Saver.q[sid+'|daily_'+S.date]&&k in Saver.q[sid+'|daily_'+S.date].ch)return;
         const val=getPath(d,k);const t=el.dataset.ty;const nv=val==null?'':(t==='money'||t==='int')?won(val):String(val);if(el.value!==nv)el.value=nv;});
       $$('[data-chips]',body).forEach(el=>{if(el.contains(document.activeElement))return;this.chips(el,this.fmap[el.dataset.chips]);});
       this.recalc();return;}
     const edit=S.edit;
-    body.innerHTML=(edit?'':this.meta(d))+secs.map(s=>`<div class="card"><h3>${esc(s.t)}${s.hint?`<span class="hint">${esc(s.hint)}</span>`:''}</h3><div class="${s.fields.some(f=>f.full||['mid','workers','people','peopleMemo'].includes(f.ty))?'':'grid'}" style="display:grid;gap:10px;${s.fields.some(f=>f.full||['mid','workers','people','peopleMemo'].includes(f.ty))?'':''}">${s.fields.map(f=>this.fieldHtml(f,d,edit)).join('')}</div></div>`).join('');
+    const pairSec=s=>s.fields.every(f=>f.ty==='pair'||f.ty==='calcpair');
+    const pairHtml=s=>`<div class="pairs"><div></div><div class="ph">테이블</div><div class="ph">고객수</div>${s.fields.map(f=>{const v=fval(f,d)||[];const cell=i=>f.ty==='calcpair'?`<div class="ro" data-calc="${f.k}#${i?'G':'T'}">${v[i]==null?'-':won(v[i])}</div>`:edit?`<input inputmode="numeric" data-k="${f.k}${i?'G':'T'}" data-ty="int" value="${d[f.k+(i?'G':'T')]??''}">`:`<div class="pv">${v[i]==null?'-':won(v[i])}</div>`;return `<div class="pl">${esc(f.l)}</div>${cell(0)}${cell(1)}`;}).join('')}</div>`;
+    body.innerHTML=(edit?'':this.meta(d))+secs.map(s=>{const wide=s.fields.some(f=>f.full||['mid','workers','people','peopleMemo'].includes(f.ty));return `<div class="card"><h3>${esc(s.t)}${s.hint&&!pairSec(s)?`<span class="hint">${esc(s.hint)}</span>`:''}</h3>${pairSec(s)?pairHtml(s):`<div class="${wide?'':'grid'}" style="display:grid;gap:10px">${s.fields.map(f=>this.fieldHtml(f,d,edit)).join('')}</div>`}</div>`;}).join('');
     this.built=edit;
     if(!edit)return;
     $$('input[data-k],textarea[data-k]',body).forEach(el=>{const k=el.dataset.k,t=el.dataset.ty;
@@ -587,7 +603,7 @@ const Log={
       modal(`<h2>${esc(p.n)}</h2><div class="f"><label>${isT?'근무시간 (숫자만 입력: 1030 2000)':'반근무 내용 (예: 대체반차, 오전, 오후북촌)'}</label><input id="dv" ${isT?'inputmode="numeric"':''} value="${esc(isT?(p.t||'').replace(/[:~]/g,m=>m==='~'?' ':''):(p.m||''))}"></div>${isT?'<div class="muted" id="dprev" style="margin-top:6px"></div>':''}<div class="row"><button class="btn bad" id="dDel">삭제</button><button class="btn" id="dOk">확인</button></div>`,(m,close)=>{const inp=$('#dv',m);const pv=()=>{if(isT)$('#dprev',m).textContent=inp.value?'→ '+parseTimeRange(inp.value):'';};inp.oninput=pv;pv();setTimeout(()=>inp.focus(),50);
         const ok=()=>{if(isT)p.t=parseTimeRange(inp.value);else p.m=inp.value.trim();close();save(a);};$('#dOk',m).onclick=ok;inp.onkeydown=e=>{if(e.key==='Enter')ok();};$('#dDel',m).onclick=()=>{a.splice(i,1);close();save(a);};});};
     const a0=arr();
-    el.innerHTML=`<div class="chips">${a0.map((x,i)=>`<button type="button" class="chip" data-i="${i}">${esc(nm(x))}${isObj&&(x.t||x.m)?` <small>${esc(x.t||x.m)}</small>`:''}${isObj?'':' <span class="x">×</span>'}</button>`).join('')}<div class="sugwrap"><input class="in" placeholder="이름 입력 또는 선택" autocomplete="off"><div class="sug hide"></div></div></div>`;
+    el.innerHTML=`<div class="chips">${a0.map((x,i)=>`<button type="button" class="chip" data-i="${i}">${esc(nm(x))}${isObj&&(x.t||x.m)?` <small>${esc(x.t||x.m)}</small>`:''}${isObj?'':' <span class="x">×</span>'}</button>`).join('')}<div class="sugwrap"><input class="in" placeholder="이름 입력 또는 선택 (여러 명 가능)" autocomplete="off"><div class="sug hide"></div></div></div>`;
     $$('.chip',el).forEach(c=>c.onclick=()=>{const i=+c.dataset.i;if(isObj)detail(i);else{const a=arr();a.splice(i,1);save(a);}});
     const inp=$('input',el),sg=$('.sug',el);const opts=namesFor(sid,f.src);
     const add=n=>{n=n.trim();if(!n)return;const a=arr();if(a.some(x=>nm(x)===n)){inp.value='';sg.classList.add('hide');return;}a.push(isObj?{n}:n);this.put(f.k,a);Saver.flush();this.chips(el,f);if(isObj)detail(a.length-1);else setTimeout(()=>$('input',el).focus(),0);};
@@ -602,19 +618,19 @@ const Log={
     $$('[data-c]',body).forEach(el=>el.onchange=()=>{const now=new Date();Saver.put(this.sid,'daily_'+S.date,'chk/'+el.dataset.c,el.checked?`${DB.me.name} ${pad(now.getHours())}:${pad(now.getMinutes())}`:null);Saver.flush();});
   },
   sumCell(f,list){if(f.nosum)return'';
-    if(['money','int','calc'].includes(f.ty)){let any=false,s=0;list.forEach(d=>{const v=fval(f,d);if(v!=null&&v!==''){any=true;s+=num(v);}});return any?won(s):'';}
+    if(['money','int','calc','pnum'].includes(f.ty)){let any=false,s=0;list.forEach(d=>{const v=fval(f,d);if(v!=null&&v!==''){any=true;s+=num(v);}});return any?won(s):'';}
     if(f.ty==='pair'||f.ty==='calcpair'){let any=false,a=0,b=0;list.forEach(d=>{const v=fval(f,d);if(v){any=true;a+=num(v[0]);b+=num(v[1]);}});return any?`${won(a)} ; ${won(b)}`:'';}
     if(f.ty==='workers'){const h=list.reduce((s,d)=>s+(fval(f,d)||[]).reduce((x,p)=>x+hoursOf(p.t),0),0);return h?`${h}시간`:'';}
     return'';},
   drawWeek(a,docs,wk){const sid=this.sid,body=$('#logBody',this.v);if(document.activeElement&&document.activeElement.id==='wkRev')return;const days=[...Array(7)].map((_,i)=>addDays(a,i));const ds=days.map(x=>docs['daily_'+x]||{});const td=today();
-    const rows=logSchema(sid).map(s=>`<tr><th class="st" colspan="9" style="background:#efe7d3">${esc(s.t)}</th></tr>`+s.fields.map(f=>{const n=['money','int','calc','pair','calcpair'].includes(f.ty);
+    const rows=logSchema(sid).map(s=>`<tr><th class="st" colspan="9" style="background:#efe7d3">${esc(s.t)}</th></tr>`+splitPairs(s.fields).map(f=>{const n=['money','int','calc','pnum'].includes(f.ty);
       return `<tr><td class="st">${esc(f.l)}</td>${ds.map((d,i)=>`<td data-go="${days[i]}" style="cursor:pointer" class="${n?'n':'txt clip'} ${days[i]===td?'today':''}"><div>${esc(ftext(f,d))}</div></td>`).join('')}<td class="n tot">${this.sumCell(f,ds)}</td></tr>`;}).join('')).join('');
     body.innerHTML=`<div class="muted" style="margin:4px 2px">날짜나 그 날짜의 칸을 누르면 그날 일지를 자세히 봅니다.</div><div class="tw"><table class="t"><thead><tr><th class="st">항목</th>${days.map(x=>`<th data-go="${x}" class="wk${dowOf(x)} ${x===td?'today':''}" style="cursor:pointer;min-width:104px">${+x.slice(5,7)}/${+x.slice(8)} (${DOW[dowOf(x)]})</th>`).join('')}<th class="tot">주간합계</th></tr></thead><tbody>${rows}</tbody></table></div>`+
       (sid==='market'?`<div class="card"><h3>주간 총평</h3>${canWrite(sid)?`<textarea class="in mid" id="wkRev" style="width:100%" placeholder="이번 주 총평">${esc(wk&&wk.review||'')}</textarea>`:`<div class="val">${esc(wk&&wk.review||'-')}</div>`}</div>`:'');
     $$('[data-go]',body).forEach(h=>h.onclick=()=>{S.date=h.dataset.go;S.view='day';renderView();});
     const wr=$('#wkRev',body);if(wr){wr.oninput=()=>Saver.put(sid,'week_'+a,'review',wr.value||null);wr.onblur=()=>Saver.flush();}
   },
-  drawMonth(docs){const sid=this.sid,body=$('#logBody',this.v);const ym=ymOf(S.date);const n=daysIn(ym);const fs=allFields(sid).filter(f=>f.m);const td=today();
+  drawMonth(docs){const sid=this.sid,body=$('#logBody',this.v);const ym=ymOf(S.date);const n=daysIn(ym);const fs=splitPairs(allFields(sid).filter(f=>f.m));const td=today();
     const days=[...Array(n)].map((_,i)=>`${ym}-${pad(i+1)}`);const ds=days.map(x=>docs['daily_'+x]||{});
     const kp=fs.filter(f=>f.ty!=='people').slice(0,4);
     body.innerHTML=`<div class="kpis">${kp.map(f=>`<div class="kpi"><span>${esc(f.l)} 월 합계</span><b>${this.sumCell(f,ds)||'-'}</b></div>`).join('')}</div>
@@ -656,6 +672,7 @@ const Stock={
     const ready=()=>{if(this.cfg&&this.doc&&this.prev!==undefined)this.draw();};
     if(K.single){this.cfg={cats:[{id:'c',name:'채개장'}],items:{chae:{name:'채개장',cat:'c',o:1}}};}
     else _viewUnsubs.push(DB.watch(`stores/${sid}/config/${kind}`,d=>{this.cfg=d||(DB.mode==='demo'?DEMO_STOCK[kind]:{cats:[],items:{}});ready();}));
+    this.units={};if(K.price)_viewUnsubs.push(DB.watch(`${coll}/unitcfg`,u=>{this.units=(u&&u.div)||{};const q=Saver.q[sid+'|unitcfg'];if(q)for(const k in q.ch)this.units[k.split('/')[1]]=q.ch[k];if(this.cfg&&this.doc&&this.prev!==undefined){this.built=false;this.draw();}}));
     _viewUnsubs.push(DB.watch(`${coll}/${this.docId}`,d=>{this.doc=d||{};const q=Saver.q[sid+'|'+this.docId];if(q)for(const k in q.ch)setPath(this.doc,k,q.ch[k]);ready();}));
     _viewUnsubs.push(DB.watch(`${coll}/${kind}_${addMonth(ym,-1)}`,d=>{this.prev=d;ready();}));
   },
@@ -670,7 +687,7 @@ const Stock={
       if(canWrite(this.sid)&&!this._syncing){const ch={};items.forEach(it=>{const cur=this.doc.carry&&this.doc.carry[it.id];if(num(cur)!==this._prevEnd[it.id]||(cur==null&&this._prevEnd[it.id]!==0))ch['carry/'+it.id]=this._prevEnd[it.id];});
         if(Object.keys(ch).length){this._syncing=true;DB.commit(this.sid,this.docId,ch,'전월 재고 자동 이월').catch(console.error).finally(()=>setTimeout(()=>this._syncing=false,500));}}}
     return items;},
-  invRow(it,all){const sm=all[it.id]||{};const c=this.carryOf(it.id),inn=sm.in||0,use=sm.use||0,book=c+inn-use;const cv=this.doc.count&&this.doc.count[it.id];const count=cv==null?null:num(cv);const end=count==null?book:count;return{c,inn,use,book,count,end,diff:count==null?0:Math.round((count-book)*100)/100,p:num(it.price)+num(it.vat)};},
+  invRow(it,all){const sm=all[it.id]||{};const c=this.carryOf(it.id),inn=sm.in||0,use=sm.use||0,book=c+inn-use;const cv=this.doc.count&&this.doc.count[it.id];const count=cv==null?null:num(cv);const end=count==null?book:count;return{c,inn,use,book,count,end,diff:count==null?0:Math.round((count-book)*100)/100,p0:num(it.price)+num(it.vat),p:(num(it.price)+num(it.vat))/(num(this.units&&this.units[it.id])||1)};},
   draw(){const items=this.prep();if(!items.length&&!this.K.single){$('#stBody',this.v).innerHTML=`<div class="card muted">등록된 품목이 없습니다. 관리자 화면의 품목 관리에서 품목을 등록하거나 초기 품목 파일을 불러와 주세요.</div>`;return;}
     if(this.K.single)return S.stockView==='table'?this.drawChaeTable():this.drawChaeEntry();
     if(S.stockView==='table')return this.drawTable(items);if(S.stockView==='sum')return this.drawSum(items);this.drawEntry(items);},
@@ -686,11 +703,12 @@ const Stock={
     body.innerHTML=cb+`<div class="card"><h3>${esc(cat.name||'')}<span class="hint">${isToday?'오늘':fmtDate(S.date)} 기준 · ${K.cols.map(c=>c[1]).join(', ')}만 입력하면 재고는 자동 계산됩니다</span></h3>
       ${edit?'<input class="in" id="stQ" placeholder="품목 검색" style="margin-bottom:6px">':''}
       ${list.map(it=>{const s=stockAt(it.id);const t=(this.doc.d&&this.doc.d[dd]&&this.doc.d[dd][it.id])||{};
-        return `<div class="item" data-name="${esc(it.name)}"><div class="nm">${esc(it.name)}<small>${esc([it.spec,it.vendor].filter(Boolean).join(' · '))}${!edit&&K.cols.some(c=>t[c[0]])?' '+K.cols.filter(c=>t[c[0]]).map(c=>`${c[1]} ${won(t[c[0]])}`).join(' / '):''}</small></div>
+        return `<div class="item" data-name="${esc(it.name)}"><div class="nm">${esc(it.name)}<small>${esc([it.spec,it.vendor,K.price&&num(this.units[it.id])>1?`수량은 단가 단위의 1/${this.units[it.id]}로 입력`:null].filter(Boolean).join(' · '))}${!edit&&K.cols.some(c=>t[c[0]])?' '+K.cols.filter(c=>t[c[0]]).map(c=>`${c[1]} ${won(t[c[0]])}`).join(' / '):''}</small></div>
         <div class="stk ${s<0?'neg':''}" data-stk="${it.id}">${won(s)}<small>${isToday?'현재 재고':'이날 재고'}</small></div>
-        ${edit?`<div class="ins">${K.cols.map(c=>`<div><label>${c[1]}</label><input inputmode="decimal" data-k="d/${dd}/${it.id}/${c[0]}" value="${t[c[0]]??''}"></div>`).join('')}${K.count&&!cat.noPrice?`<div><label>월말 실사재고</label><input inputmode="decimal" data-k="count/${it.id}" value="${(this.doc.count&&this.doc.count[it.id])??''}"></div>`:''}${K.count&&cat.noPrice?`<div><label>이달 수량</label><input inputmode="decimal" data-k="count/${it.id}" value="${(this.doc.count&&this.doc.count[it.id])??''}"></div>`:''}</div>`:''}</div>`;}).join('')||'<div class="muted">이 분류에 품목이 없습니다.</div>'}</div>`;
+        ${edit?`<div class="ins">${K.cols.map(c=>`<div><label>${c[1]}</label><input inputmode="decimal" data-k="d/${dd}/${it.id}/${c[0]}" value="${t[c[0]]??''}"></div>`).join('')}${K.count&&!cat.noPrice?`<div><label>월말 실사재고</label><input inputmode="decimal" data-k="count/${it.id}" value="${(this.doc.count&&this.doc.count[it.id])??''}"></div>`:''}${K.price&&!cat.noPrice?`<div><label>수량 단위</label><select data-unit="${it.id}" style="width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 4px;background:#fff"><option value="1">단가와 같은 단위</option><option value="100" ${num(this.units[it.id])===100?'selected':''}>g 입력, 단가는 100g 기준</option><option value="1000" ${num(this.units[it.id])===1000?'selected':''}>g(ml) 입력, 단가는 1kg(1L) 기준</option></select></div>`:''}${K.count&&cat.noPrice?`<div><label>이달 수량</label><input inputmode="decimal" data-k="count/${it.id}" value="${(this.doc.count&&this.doc.count[it.id])??''}"></div>`:''}</div>`:''}</div>`;}).join('')||'<div class="muted">이 분류에 품목이 없습니다.</div>'}</div>`;
     this.bindCat(body);this.built=edit;if(!edit)return;
     $$('input[data-k]',body).forEach(el=>{el.oninput=()=>{const n=numOrNull(el.value);if(n==null&&el.value.trim()!=='')return;this.put(el.dataset.k,n);this.drawEntry(items);};el.onblur=()=>Saver.flush();});
+    $$('[data-unit]',body).forEach(el=>el.onchange=()=>{const v=+el.value;Saver.put(this.sid,'unitcfg','div/'+el.dataset.unit,v>1?v:null);this.units[el.dataset.unit]=v>1?v:null;Saver.flush();toast('수량 단위를 저장했습니다. 매입금액과 재고금액이 이 단위로 계산됩니다.');});
     const q=$('#stQ',body);if(q)q.oninput=()=>$$('.item',body).forEach(r=>r.classList.toggle('hide',!r.dataset.name.includes(q.value.trim())));
   },
   drawTable(items){const body=$('#stBody',this.v),K=this.K,n=daysIn(this.ym),td=today();let h=this.catBar();const list=items.filter(i=>i.cat===S.cat);const all=this.sums(this.doc);const d=this.doc.d||{};
@@ -703,7 +721,7 @@ const Stock={
       <tr class="tot"><td class="st tot">합계</td>${list.map(it=>K.cols.map(c=>`<td class="n">${won((all[it.id]||{})[c[0]]||0)}</td>`).join('')+`<td class="n">${won(run[it.id])}</td>`).join('')}</tr></tbody></table></div>`;
     }else{const cat=(this.cfg.cats||[]).find(c=>c.id===S.cat)||{};const days=[...Array(n)].map((_,i)=>pad(i+1)).filter(dd=>d[dd]&&list.some(it=>d[dd][it.id]&&d[dd][it.id].in));
       let tb=0,ts=0;const np=cat.noPrice;const rows=list.map(it=>{const r=this.invRow(it,all);tb+=r.p*r.inn;ts+=r.p*r.end;
-        return `<tr><td class="st">${esc(it.name)}</td><td>${esc(it.spec||'')}</td>${np?'':`<td class="n">${won(it.price)}</td><td class="n">${won(it.vat)}</td><td class="n">${won(r.p)}</td>`}${days.map(dd=>`<td class="n">${won((d[dd][it.id]||{}).in)||''}</td>`).join('')}<td class="n tot">${won(r.inn)}</td><td class="n">${canCarry?`<input data-k="carryM/${it.id}" value="${r.c}">`:won(r.c)}</td><td class="n">${won(r.use)}</td><td class="n tot" ${r.book<0?'style="color:var(--bad)"':''}>${won(r.book)}</td><td class="n">${r.count==null?'':won(r.count)}</td><td class="n" ${r.diff?'style="color:var(--bad);font-weight:700"':''}>${r.count==null?'':(r.diff>0?'+':'')+won(r.diff)}</td>${np?'':`<td class="n">${won(r.p*r.inn)}</td><td class="n tot">${won(r.p*r.end)}</td>`}</tr>`;}).join('');
+        return `<tr><td class="st">${esc(it.name)}</td><td>${esc(it.spec||'')}</td>${np?'':`<td class="n">${won(it.price)}</td><td class="n">${won(it.vat)}</td><td class="n">${won(r.p0)}</td>`}${days.map(dd=>`<td class="n">${won((d[dd][it.id]||{}).in)||''}</td>`).join('')}<td class="n tot">${won(r.inn)}</td><td class="n">${canCarry?`<input data-k="carryM/${it.id}" value="${r.c}">`:won(r.c)}</td><td class="n">${won(r.use)}</td><td class="n tot" ${r.book<0?'style="color:var(--bad)"':''}>${won(r.book)}</td><td class="n">${r.count==null?'':won(r.count)}</td><td class="n" ${r.diff?'style="color:var(--bad);font-weight:700"':''}>${r.count==null?'':(r.diff>0?'+':'')+won(r.diff)}</td>${np?'':`<td class="n">${won(r.p*r.inn)}</td><td class="n tot">${won(r.p*r.end)}</td>`}</tr>`;}).join('');
       h+=`<div class="tw"><table class="t"><thead><tr><th class="st">상품명</th><th>규격</th>${np?'':'<th>단가</th><th>부가세</th><th>포함가</th>'}${days.map(dd=>`<th>${+dd}일</th>`).join('')}<th class="tot">매입계</th><th>이월</th><th>사용</th><th class="tot">장부재고</th><th>실사재고</th><th>차이</th>${np?'':'<th>매입금액</th><th class="tot">재고금액</th>'}</tr></thead><tbody>${rows}
         ${np?'':`<tr class="tot"><td class="st tot">합계</td><td colspan="${days.length+10}"></td><td class="n">${won(tb)}</td><td class="n">${won(ts)}</td></tr>`}</tbody></table></div>
         <div class="muted" style="margin-top:6px">장부재고 = 이월 + 매입계 - 사용(직원이 기록한 수량 그대로). 월말에 실사재고를 넣어도 기록된 매입과 사용은 바뀌지 않고, 장부재고와의 차이만 따로 표시됩니다. 재고금액 = (단가 + 부가세) × 재고이며, 실사재고가 있으면 실사 수량으로, 없으면 장부재고로 계산합니다.</div>`;}
@@ -747,7 +765,7 @@ const Stock={
     $$('[data-go]',body).forEach(r=>r.onclick=()=>{S.date=r.dataset.go;S.stockView='entry';renderView();});
     $$('input[data-k]',body).forEach(el=>{el.onclick=e=>e.stopPropagation();el.onchange=()=>{this.put(el.dataset.k,numOrNull(el.value));Saver.flush();};});
   },
-  label(sid,docId,key){if(docId==='vendormemo'){const f=key.split('/')[2];return '거래처 메모 · '+({name:'업체명',memo:'내용',_del:'삭제',o:'추가'}[f]||f);}const kind=docId.split('_')[0];const K=KINDS[kind];const p=key.split('/');const cfg=DB.cache[`stores/${sid}/config/${kind}`]||{};const nm=id=>id==='chae'?'채개장':((cfg.items&&cfg.items[id]&&cfg.items[id].name)||id);
+  label(sid,docId,key){if(docId==='unitcfg'){const c=DB.cache[`stores/${sid}/config/inv`]||{};const id=key.split('/')[1];return ((c.items&&c.items[id]&&c.items[id].name)||id)+' · 수량 단위(1/N)';}if(docId==='vendormemo'){const f=key.split('/')[2];return '거래처 메모 · '+({name:'업체명',memo:'내용',_del:'삭제',o:'추가'}[f]||f);}const kind=docId.split('_')[0];const K=KINDS[kind];const p=key.split('/');const cfg=DB.cache[`stores/${sid}/config/${kind}`]||{};const nm=id=>id==='chae'?'채개장':((cfg.items&&cfg.items[id]&&cfg.items[id].name)||id);
     if(p[0]==='d'){const c=K&&K.cols.find(c=>c[0]===p[3]);return `${+p[1]}일 · ${nm(p[2])} · ${c?c[1]:p[3]}`;}
     if(p[0]==='count')return `${nm(p[1])} · 실사재고`;if(p[0]==='carry')return `${nm(p[1])} · 이월(자동)`;if(p[0]==='carryM')return `${nm(p[1])} · 이월(직접 수정)`;return key;}
 };
@@ -846,8 +864,8 @@ const Cash={
 // ===== 변경이력 · 복구 =====
 const Hist={
   docLabel(docId){const[k,rest]=[docId.split('_')[0],docId.split('_').slice(1).join('_')];
-    if(k==='daily')return fmtDate(rest)+' 업무일지';if(k==='week')return rest+' 주간 총평';if(KINDS[k])return `${rest} ${KINDS[k].name}`;if(k==='cash')return `${rest} 현금출납장`;if(docId==='prepaid')return'선결제';if(docId==='vendormemo')return'거래처 메모';return docId;},
-  keyLabel(h,key){const k=h.docId.split('_')[0];try{if(k==='daily'||k==='week')return Log.label(h.sid,key);if(KINDS[k]||h.docId==='vendormemo')return Stock.label(h.sid,h.docId,key);if(k==='cash'||h.docId==='prepaid')return Cash.label(h.docId,key);}catch(e){}return key;},
+    if(k==='daily')return fmtDate(rest)+' 업무일지';if(k==='week')return rest+' 주간 총평';if(KINDS[k])return `${rest} ${KINDS[k].name}`;if(k==='cash')return `${rest} 현금출납장`;if(docId==='prepaid')return'선결제';if(docId==='vendormemo')return'거래처 메모';if(docId==='unitcfg')return'재고 수량 단위 설정';return docId;},
+  keyLabel(h,key){const k=h.docId.split('_')[0];try{if(k==='daily'||k==='week')return Log.label(h.sid,key);if(KINDS[k]||h.docId==='vendormemo'||h.docId==='unitcfg')return Stock.label(h.sid,h.docId,key);if(k==='cash'||h.docId==='prepaid')return Cash.label(h.docId,key);}catch(e){}return key;},
   val(v){if(v==null||v==='')return'(빈칸)';if(v===true)return'예';if(Array.isArray(v))return v.map(x=>typeof x==='object'?(x.n+(x.t||x.m?`(${x.t||x.m})`:'')):x).join(', ')||'(빈칸)';if(typeof v==='number')return won(v);if(typeof v==='object')return JSON.stringify(v);return String(v);},
   entryHtml(h,showDoc){const keys=Object.keys(h.after||{}).filter(k=>k!=='writers'||Object.keys(h.after).length===1);const admin=DB.me.role==='admin'&&h.sid!=='_admin';
     return `<div class="hist"><div class="hd"><b>${esc(h.byName||'')}</b><span class="muted">${fmtTs(h.at||h.last)}${h.at&&h.last&&fmtTs(h.at)!==fmtTs(h.last)?' ~ '+fmtTs(h.last).split(' ')[1]:''}</span>
@@ -1206,7 +1224,7 @@ const Xport={
     if(!sheets.length)throw new Error('등록된 품목이 없습니다.');XW.save(XW.book(T,sheets),`${STORES[sid].name}_${this.ymL(ym)} 주류재고.xlsx`);},
   // ---------- 재고조사표 ----------
   async inv(sid,ym){const coll=`stores/${sid}/data`;const y=ym.slice(0,4);const cfg=await this.cfgOf(sid,'inv');const year=await DB.getRange(coll,`inv_${y}-01`,`inv_${y}-12`);const doc=year['inv_'+ym]||{};const prev=+ym.slice(5)===1?await DB.get(`${coll}/inv_${addMonth(ym,-1)}`):(year['inv_'+addMonth(ym,-1)]||null);
-    const items=this.itemsOf(cfg);const lg=this.ledger('inv',doc,prev,items.map(i=>i.id));const T=XTPL.inv;const n=daysIn(ym);const sheets=[];const totals=[];
+    const items=this.itemsOf(cfg);const uc=await DB.get(`${coll}/unitcfg`);const DIV=id=>num(uc&&uc.div&&uc.div[id])>1?num(uc.div[id]):1;const lg=this.ledger('inv',doc,prev,items.map(i=>i.id));const T=XTPL.inv;const n=daysIn(ym);const sheets=[];const totals=[];
     for(const cat of(cfg.cats||[]).filter(c=>!c.noPrice)){const list=items.filter(i=>i.cat===cat.id);if(!list.length)continue;const tpl=T.sheets.cat;const m=XW.model(tpl);const hasV=list.some(i=>i.vendor);const o=hasV?1:0;
       const C=k=>XW.L(k+o);const tc=(r,k)=>{const c=tpl.rows[r].c[XW.L(k)];return c?c[0]:0;};
       const w=[];tpl.colw.forEach(([a,b,wd,s,h])=>{for(let k=a;k<=Math.min(b,45);k++)w[k]=[wd,s];});const cg=[];if(hasV)cg.push([1,1,12,w[1]&&w[1][1]]);for(let k=1;k<=45;k++)if(w[k])cg.push([k+o,k+o,w[k][0],w[k][1]]);cg.push([46+o,47+o,10.5,w[43]&&w[43][1]]);m.colGen=cg;
@@ -1215,17 +1233,17 @@ const Xport={
       for(let k=1;k<=45;k++){XW.set(m,C(k)+1,null,{s:tc(1,k)});const hv=tpl.rows[2].c[XW.L(k)];XW.set(m,C(k)+2,hv?hv[1]:null,{s:tc(2,k)});}
       if(hasV){XW.set(m,'A1',cat.name,{s:tc(1,1)});XW.set(m,'A2','업체',{s:tc(2,1)});XW.set(m,'B1',null,{s:tc(1,2)});}else XW.set(m,'A1',cat.name,{s:tc(1,1)});
       XW.set(m,C(41)+1,`${+ym.slice(5)}월`,{s:tc(1,41)});XW.set(m,C(45)+2,'재고금액(포함)',{s:tc(2,45)});XW.set(m,C(46)+2,'장부재고',{s:tc(2,43)});XW.set(m,C(47)+2,'실사차이',{s:tc(2,43)});
-      let sb=0,ss=0;const dayAmt=Array(32).fill(0);
+      let sb=0,ss=0,anyDiv=false;const dayAmt=Array(32).fill(0);
       list.forEach((it,i)=>{const r=3+i;m.rows[r]={a:{...tpl.rows[3].a},c:{}};for(let k=1;k<=45;k++)XW.set(m,C(k)+r,null,{s:tc(3,k)});if(hasV)XW.set(m,'A'+r,it.vendor||null,{s:tc(3,2)});
-        const s=lg.sums[it.id]||{},c=lg.carry[it.id]||0,inn=s.in||0,use=s.use||0,book=c+inn-use;const cv=doc.count&&doc.count[it.id];const end=cv==null?book:num(cv);const p=num(it.price)+num(it.vat);
+        const s=lg.sums[it.id]||{},c=lg.carry[it.id]||0,inn=s.in||0,use=s.use||0,book=c+inn-use;const cv=doc.count&&doc.count[it.id];const end=cv==null?book:num(cv);const p=num(it.price)+num(it.vat),dv=DIV(it.id),dvf=dv>1?'/'+dv:'';if(dv>1)anyDiv=true;
         XW.set(m,C(1)+r,it.name);XW.set(m,C(2)+r,it.spec||null);XW.set(m,C(3)+r,it.price??null);XW.set(m,C(4)+r,it.vat??null);XW.set(m,C(5)+r,p,{f:`${C(3)}${r}+${C(4)}${r}`});
-        for(let d=1;d<=n;d++){const q=doc.d&&doc.d[pad(d)]&&doc.d[pad(d)][it.id]&&doc.d[pad(d)][it.id].in;if(q){XW.set(m,C(5+d)+r,num(q));dayAmt[d]+=p*num(q);}}
+        for(let d=1;d<=n;d++){const q=doc.d&&doc.d[pad(d)]&&doc.d[pad(d)][it.id]&&doc.d[pad(d)][it.id].in;if(q){XW.set(m,C(5+d)+r,num(q));dayAmt[d]+=p*num(q)/dv;}}
         XW.set(m,C(40)+r,inn,{f:`SUM(${C(6)}${r}:${C(36)}${r})`});XW.set(m,C(41)+r,c);
         if(cv==null)XW.set(m,C(42)+r,book,{f:`${C(41)}${r}+${C(40)}${r}-${C(43)}${r}`});else XW.set(m,C(42)+r,end);
-        XW.set(m,C(43)+r,use);XW.set(m,C(44)+r,p*inn,{f:`(${C(3)}${r}+${C(4)}${r})*${C(40)}${r}`});XW.set(m,C(45)+r,p*end,{f:`(${C(3)}${r}+${C(4)}${r})*${C(42)}${r}`});
-        XW.set(m,C(46)+r,book,{s:tc(3,43),f:`${C(41)}${r}+${C(40)}${r}-${C(43)}${r}`});XW.set(m,C(47)+r,cv==null?null:Math.round((end-book)*100)/100,{s:tc(3,43),f:cv==null?0:`${C(42)}${r}-${C(46)}${r}`});sb+=p*inn;ss+=p*end;});
+        XW.set(m,C(43)+r,use);XW.set(m,C(44)+r,p*inn/dv,{f:`(${C(3)}${r}+${C(4)}${r})*${C(40)}${r}${dvf}`});XW.set(m,C(45)+r,p*end/dv,{f:`(${C(3)}${r}+${C(4)}${r})*${C(42)}${r}${dvf}`});
+        XW.set(m,C(46)+r,book,{s:tc(3,43),f:`${C(41)}${r}+${C(40)}${r}-${C(43)}${r}`});XW.set(m,C(47)+r,cv==null?null:Math.round((end-book)*100)/100,{s:tc(3,43),f:cv==null?0:`${C(42)}${r}-${C(46)}${r}`});sb+=p*inn/dv;ss+=p*end/dv;});
       m.rows[R]={a:{...tpl.rows[81].a},c:{}};for(let k=1;k<=45;k++)XW.set(m,C(k)+R,null,{s:tc(81,k)});if(hasV){XW.set(m,'A'+R,'매입합계',{s:tc(81,1)});XW.set(m,'B'+R,null,{s:tc(81,2)});}else XW.set(m,'A'+R,'매입합계');
-      for(let d=1;d<=n;d++)XW.set(m,C(5+d)+R,dayAmt[d],{f:`SUMPRODUCT(($${C(3)}$3:$${C(3)}$${R-1}+$${C(4)}$3:$${C(4)}$${R-1})*${C(5+d)}3:${C(5+d)}${R-1})`});
+      for(let d=1;d<=n;d++)XW.set(m,C(5+d)+R,Math.round(dayAmt[d]),anyDiv?{}:{f:`SUMPRODUCT(($${C(3)}$3:$${C(3)}$${R-1}+$${C(4)}$3:$${C(4)}$${R-1})*${C(5+d)}3:${C(5+d)}${R-1})`});
       XW.set(m,C(44)+R,sb,{f:`SUM(${C(44)}3:${C(44)}${R-1})`});XW.set(m,C(45)+R,ss,{f:`SUM(${C(45)}3:${C(45)}${R-1})`});
       const sh={name:cat.name,model:m};sheets.push(sh);if(!cat.noTotal)totals.push({sh,cell:`${C(45)}${R}`,v:ss,label:cat.name});}
     // 총 재고 금액
