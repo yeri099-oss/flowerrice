@@ -146,6 +146,10 @@ table.t tr.click:hover td{background:#fffbea}
 .pairs .pv{text-align:right;font-weight:600;font-variant-numeric:tabular-nums;padding:6px 10px}
 .pairs .ro{min-height:0}
 @media(max-width:1024px){.tw{max-height:none!important;overflow-y:visible}table.t thead th{position:static}table.t thead th.st{position:sticky}}
+
+.items{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:10px}
+.items .item{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:#fffdf8;grid-template-columns:1fr auto;align-content:start}
+.items .item:last-child{border-bottom:1px solid var(--line)}
 </style></head>
 <body><div id="app"><div style="padding:40vh 0;text-align:center;color:#7a7166">불러오는 중…</div></div>
 <script src="firebase-config.js"></script>
@@ -496,6 +500,9 @@ function bindDateNav(el,unit,cb){
 }
 function weekRange(sid,d){const ws=STORES[sid]?STORES[sid].weekStart:1;const off=(dowOf(d)-ws+7)%7;const a=addDays(d,-off);return[a,addDays(a,6)];}
 
+// 숨은 오류가 나면 화면에 알려 준다 (원인 파악용)
+addEventListener('error',e=>{if(e&&e.message&&!/ResizeObserver|Script error/.test(e.message))toast('오류: '+e.message,5000);});
+addEventListener('unhandledrejection',e=>{const m=e&&e.reason&&(e.reason.message||e.reason.code||String(e.reason));if(m)toast('오류: '+m,5000);});
 async function boot(){
   try{await DB.init();}catch(e){root().innerHTML=`<div class="login card"><h2>연결 오류</h2><p>${esc(e.message)}</p></div>`;return;}
   if(DB.mode==='demo'){const b=document.createElement('div');b.className='demo';b.textContent='미리보기(데모) 모드 · Firebase 설정 전';document.body.prepend(b);}
@@ -702,10 +709,10 @@ const Stock={
     const cb=this.catBar();const list=items.filter(i=>i.cat===S.cat);const cat=(this.cfg.cats||[]).find(c=>c.id===S.cat)||{};
     body.innerHTML=cb+`<div class="card"><h3>${esc(cat.name||'')}<span class="hint">${isToday?'오늘':fmtDate(S.date)} 기준 · ${K.cols.map(c=>c[1]).join(', ')}만 입력하면 재고는 자동 계산됩니다</span></h3>
       ${edit?'<input class="in" id="stQ" placeholder="품목 검색" style="margin-bottom:6px">':''}
-      ${list.map(it=>{const s=stockAt(it.id);const t=(this.doc.d&&this.doc.d[dd]&&this.doc.d[dd][it.id])||{};
+      <div class="items">${list.map(it=>{const s=stockAt(it.id);const t=(this.doc.d&&this.doc.d[dd]&&this.doc.d[dd][it.id])||{};
         return `<div class="item" data-name="${esc(it.name)}"><div class="nm">${esc(it.name)}<small>${esc([it.spec,it.vendor,K.price&&num(this.units[it.id])>1?`수량은 단가 단위의 1/${this.units[it.id]}로 입력`:null].filter(Boolean).join(' · '))}${!edit&&K.cols.some(c=>t[c[0]])?' '+K.cols.filter(c=>t[c[0]]).map(c=>`${c[1]} ${won(t[c[0]])}`).join(' / '):''}</small></div>
         <div class="stk ${s<0?'neg':''}" data-stk="${it.id}">${won(s)}<small>${isToday?'현재 재고':'이날 재고'}</small></div>
-        ${edit?`<div class="ins">${K.cols.map(c=>`<div><label>${c[1]}</label><input inputmode="decimal" data-k="d/${dd}/${it.id}/${c[0]}" value="${t[c[0]]??''}"></div>`).join('')}${K.count&&!cat.noPrice?`<div><label>월말 실사재고</label><input inputmode="decimal" data-k="count/${it.id}" value="${(this.doc.count&&this.doc.count[it.id])??''}"></div>`:''}${K.price&&!cat.noPrice?`<div><label>수량 단위</label><select data-unit="${it.id}" style="width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 4px;background:#fff"><option value="1">단가와 같은 단위</option><option value="100" ${num(this.units[it.id])===100?'selected':''}>g 입력, 단가는 100g 기준</option><option value="1000" ${num(this.units[it.id])===1000?'selected':''}>g(ml) 입력, 단가는 1kg(1L) 기준</option></select></div>`:''}${K.count&&cat.noPrice?`<div><label>이달 수량</label><input inputmode="decimal" data-k="count/${it.id}" value="${(this.doc.count&&this.doc.count[it.id])??''}"></div>`:''}</div>`:''}</div>`;}).join('')||'<div class="muted">이 분류에 품목이 없습니다.</div>'}</div>`;
+        ${edit?`<div class="ins">${K.cols.map(c=>`<div><label>${c[1]}</label><input inputmode="decimal" data-k="d/${dd}/${it.id}/${c[0]}" value="${t[c[0]]??''}"></div>`).join('')}${K.count&&!cat.noPrice?`<div><label>월말 실사재고</label><input inputmode="decimal" data-k="count/${it.id}" value="${(this.doc.count&&this.doc.count[it.id])??''}"></div>`:''}${K.price&&!cat.noPrice?`<div><label>수량 단위</label><select data-unit="${it.id}" style="width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 4px;background:#fff"><option value="1">단가와 같은 단위</option><option value="100" ${num(this.units[it.id])===100?'selected':''}>g 입력, 단가는 100g 기준</option><option value="1000" ${num(this.units[it.id])===1000?'selected':''}>g(ml) 입력, 단가는 1kg(1L) 기준</option></select></div>`:''}${K.count&&cat.noPrice?`<div><label>이달 수량</label><input inputmode="decimal" data-k="count/${it.id}" value="${(this.doc.count&&this.doc.count[it.id])??''}"></div>`:''}</div>`:''}</div>`;}).join('')||'<div class="muted">이 분류에 품목이 없습니다.</div>'}</div></div>`;
     this.bindCat(body);this.built=edit;if(!edit)return;
     $$('input[data-k]',body).forEach(el=>{el.oninput=()=>{const n=numOrNull(el.value);if(n==null&&el.value.trim()!=='')return;this.put(el.dataset.k,n);this.drawEntry(items);};el.onblur=()=>Saver.flush();});
     $$('[data-unit]',body).forEach(el=>el.onchange=()=>{const v=+el.value;Saver.put(this.sid,'unitcfg','div/'+el.dataset.unit,v>1?v:null);this.units[el.dataset.unit]=v>1?v:null;Saver.flush();toast('수량 단위를 저장했습니다. 매입금액과 재고금액이 이 단위로 계산됩니다.');});
@@ -1064,8 +1071,12 @@ const XL={
         const rev=this.t(cell(rn,9));if(rev&&first)out.weeks[weekRange(sid,first)[0]]={review:rev};}
     });return out;},
   async loadLib(){if(window.XLSX)return;await FB.loadScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');},
-  async read(file){await this.loadLib();const wb=XLSX.read(await file.arrayBuffer(),{cellDates:true});
-    return wb.SheetNames.map(name=>{const ws=wb.Sheets[name];if(!ws['!ref'])return{name,grid:[]};const rg=XLSX.utils.decode_range(ws['!ref']);rg.s={r:0,c:0};return{name,grid:XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null,range:rg,blankrows:true})};});}
+  async read(file){await this.loadLib();await new Promise(r=>setTimeout(r,60)); // 안내 문구가 먼저 보이도록 잠깐 양보
+    const wb=XLSX.read(await file.arrayBuffer(),{cellDates:true,sheetRows:400,bookVBA:false});const out=[];
+    for(const name of wb.SheetNames){const ws=wb.Sheets[name];if(!ws||!ws['!ref']){out.push({name,grid:[]});continue;}
+      const rg=XLSX.utils.decode_range(ws['!ref']);rg.s={r:0,c:0};rg.e.r=Math.min(rg.e.r,399);rg.e.c=Math.min(rg.e.c,299); // 서식만 있는 빈 칸이 수만 개인 시트에서 멈추지 않게 범위를 제한
+      out.push({name,grid:XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null,range:rg,blankrows:true})});await new Promise(r=>setTimeout(r,0));}
+    return out;}
 };
 const Importer={
   TYPES:{log:{l:'업무일지',stores:STORE_IDS},liquor:{l:'주류재고',stores:['pida']},inv:{l:'재고조사표',stores:['bojagi','market']},chae:{l:'채개장 재고표 (1년치 전체 시트)',stores:['bojagi']},cash:{l:'현금출납장',stores:STORE_IDS}},
@@ -1074,9 +1085,12 @@ const Importer={
       <div class="grid"><div class="f"><label>엑셀 종류</label><select id="xT">${Object.entries(T).map(([k,v])=>`<option value="${k}">${v.l}</option>`).join('')}</select></div><div class="f"><label>사업장</label><select id="xS"></select></div><div class="f"><label>해당 월</label><input type="month" id="xM" value="${now}"></div><div class="f"><label>엑셀 파일 (.xlsx)</label><input type="file" id="xF" accept=".xlsx,.xls"></div></div>
       <div class="row" style="justify-content:flex-start"><button class="btn" id="xGo">내용 확인</button></div></div><div id="xOut"></div>`;
     const fillS=()=>{$('#xS',b).innerHTML=T[$('#xT',b).value].stores.map(s=>`<option value="${s}">${STORES[s].name}</option>`).join('');};$('#xT',b).onchange=fillS;fillS();
-    $('#xGo',b).onclick=async()=>{const f=$('#xF',b).files[0],type=$('#xT',b).value,sid=$('#xS',b).value,ym=$('#xM',b).value;const o=$('#xOut',b);if(!f||!ym)return toast('월과 파일을 선택해 주세요.');
-      o.innerHTML='<div class="card muted">파일을 읽는 중…</div>';let sheets;try{sheets=await XL.read(f);}catch(e){o.innerHTML=`<div class="note bad">파일을 읽지 못했습니다: ${esc(e.message)}</div>`;return;}
-      try{if(type==='log')this.log(o,sid,ym,sheets);else await this.ledger(o,type,sid,ym,sheets);}catch(e){console.error(e);o.innerHTML=`<div class="note bad">내용을 해석하지 못했습니다: ${esc(e.message)}</div>`;}};},
+    $('#xGo',b).onclick=async()=>{const btn=$('#xGo',b),f=$('#xF',b).files[0],type=$('#xT',b).value,sid=$('#xS',b).value,ym=$('#xM',b).value;const o=$('#xOut',b);if(!f)return toast('엑셀 파일을 먼저 선택해 주세요.');if(!ym)return toast('해당 월을 선택해 주세요.');
+      if(btn.disabled)return;btn.disabled=true;btn.textContent='읽는 중…';o.innerHTML=`<div class="card muted">${esc(f.name)} 파일을 읽는 중입니다. 큰 파일은 10초쯤 걸릴 수 있습니다.</div>`;
+      try{let sheets;try{sheets=await XL.read(f);}catch(e){console.error(e);o.innerHTML=`<div class="note bad">파일을 읽지 못했습니다: ${esc(e.message||e)}</div>`;return;}
+        if(type==='log')this.log(o,sid,ym,sheets);else await this.ledger(o,type,sid,ym,sheets);
+      }catch(e){console.error(e);o.innerHTML=`<div class="note bad">내용을 해석하지 못했습니다: ${esc(e.message||e)}</div>`;}
+      finally{btn.disabled=false;btn.textContent='내용 확인';o.scrollIntoView({block:'nearest',behavior:'smooth'});}};},
   async ledger(o,type,sid,ym,sheets){const path=`stores/${sid}/config/${type}`;const hasCfg=type==='liquor'||type==='inv';const cfg=hasCfg?((await DB.get(path))||{cats:[],items:{}}):null;if(cfg){cfg.cats=cfg.cats||[];cfg.items=cfg.items||{};}
     const res=XLI[type](sheets,ym,cfg);const n=Object.values(res.docs).reduce((a,d)=>a+Object.keys(d).length,0);
     if(!n&&!(res.patch&&res.patch.newItems)){o.innerHTML='<div class="note bad">등록할 내용을 찾지 못했습니다. 엑셀 종류와 월이 파일과 맞는지 확인해 주세요.</div>';return;}
