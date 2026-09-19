@@ -258,11 +258,26 @@ header.top{border-bottom:0}
 
 .ver{font-size:11px;color:var(--sub);border:1px solid var(--line);border-radius:999px;padding:2px 7px;background:#fff;font-weight:600}
 @media(pointer:coarse),(max-width:900px){#view:has(table.t .cell){padding-bottom:75vh}}
+
+/* 휴대폰: 재고 일별입력 표를 기록 중에도 한눈에 보이게 촘촘하게 */
+@media(max-width:520px){
+table.lq th,table.lq td{padding:5px 4px;font-size:13px}
+table.lq td.cat{min-width:0;max-width:46px;font-size:11.5px;padding:4px 2px;word-break:keep-all;line-height:1.25}
+table.lq td.nm2{min-width:0;max-width:112px;word-break:break-all;line-height:1.3}
+table.lq td.n{padding:3px 2px}
+table.lq td input{width:46px;min-width:0;padding:7px 2px;text-align:right;font-size:15px;border-radius:7px}
+table.lq td.tot{min-width:38px;font-size:14px!important}
+table.lq td:nth-child(3):not(.n){font-size:11px;max-width:54px;word-break:break-all}
+#stBody .fitwrap{max-width:100%}
+}
+
+/* 아이폰은 입력칸 글자가 16px보다 작으면 키패드가 뜰 때 화면을 자동 확대한다. 터치 기기에서는 16px로 맞춰 확대를 막는다 (두 손가락 확대는 그대로 가능) */
+@media(pointer:coarse){input,textarea,select{font-size:16px!important}}
 </style></head>
 <body><div id="app"><div style="padding:40vh 0;text-align:center;color:#7a7166">불러오는 중…</div></div>
 <script src="firebase-config.js"></script>
 <script>const isPhone=()=>Math.min(innerWidth,(window.screen&&screen.width)||innerWidth)<=700; // 넓은 표가 그려지는 순간 innerWidth가 잠깐 커지는 기기가 있어 화면 크기도 함께 본다
-const APP_VER='24'; // 빌드할 때 sw.js의 캐시 번호와 같은 숫자로 채워짐
+const APP_VER='26'; // 빌드할 때 sw.js의 캐시 번호와 같은 숫자로 채워짐
 'use strict';
 const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -657,6 +672,8 @@ function buildHeads(){$$('.fhead').forEach(f=>{if(!f.nextElementSibling||!f.next
     const th=t.tHead.cloneNode(true);$$('th',th).forEach(x=>{x.style.top='';x.style.transform='';x.style.width='';x.style.minWidth='';x.style.maxWidth='';});if(!ws){const o=$$('th',t.tHead);$$('th',th).forEach((x,i)=>x.style.width=o[i].getBoundingClientRect().width+'px');}
     [...t.tHead.rows].forEach((r,i)=>th.rows[i].style.height=r.getBoundingClientRect().height+'px');c.appendChild(th);f.innerHTML='';f.appendChild(c);f.style.height=hh+'px';f.style.marginBottom=(-hh)+'px';f.scrollLeft=tw.scrollLeft;});}
 new MutationObserver(rs=>{if(rs.every(r=>(r.target.closest&&r.target.closest('.fhead'))||[...r.addedNodes,...r.removedNodes].every(n=>n.classList&&n.classList.contains('fhead'))&&(r.addedNodes.length+r.removedNodes.length)))return;clearTimeout(_ftT);_ftT=setTimeout(fitTables,40);}).observe(document.documentElement,{childList:true,subtree:true});addEventListener('resize',fitTables);
+// 표 안의 입력칸에 들어가면 커서를 항상 글자 맨 뒤에 둔다 (바로 지우고 고치기 쉽게)
+addEventListener('focusin',e=>{const el=e.target;if(!el.matches||!el.matches('table.t input:not([type=checkbox]):not([type=date]):not([type=month])'))return;const end=()=>{if(document.activeElement!==el)return;try{const n=el.value.length;el.setSelectionRange(n,n);}catch(x){}};setTimeout(end,0);setTimeout(end,60);setTimeout(end,250);});
 // 터치 기기: 표 안의 칸에 커서가 들어가면 키패드에 가리지 않게 그 칸을 화면 위쪽(고정된 머리글 바로 아래)으로 올린다
 addEventListener('focusin',e=>{const el=e.target;if(!el.matches||!el.matches('table.t input:not([type=checkbox]):not([type=date]),table.t textarea'))return;if(!(matchMedia('(pointer:coarse)').matches||innerWidth<=900))return;if(el.closest('.modal'))return;
   setTimeout(()=>{if(document.activeElement!==el)return;const bar=$('#view .bar.dbar')||$('header.top');let off=0;if(bar&&getComputedStyle(bar).position==='sticky')off=Math.max(0,bar.getBoundingClientRect().bottom);const tw=el.closest('.tw');const fh=tw&&tw.previousElementSibling&&tw.previousElementSibling.classList.contains('fhead')?tw.previousElementSibling.offsetHeight:(tw&&$('thead',tw)?$('thead',tw).offsetHeight:0);
@@ -785,14 +802,14 @@ const Log={
       modal(`<h2>${esc(p.n)}</h2><div class="f"><label>반근무 내용 (예: 대체반차, 오전, 오후북촌)</label><input id="dv" value="${esc(p.m||'')}"></div><div class="row"><button class="btn bad" id="dDel">삭제</button><button class="btn" id="dOk">확인</button></div>`,(m,close)=>{const inp=$('#dv',m);setTimeout(()=>inp.focus(),50);
         const ok=()=>{p.m=inp.value.trim();close();save(a);};$('#dOk',m).onclick=ok;inp.onkeydown=e=>{if(e.key==='Enter')ok();};$('#dDel',m).onclick=()=>{a.splice(i,1);close();save(a);};});};
     const a0=arr();
-    el.innerHTML=`<div class="chips">${a0.map((x,i)=>`<button type="button" class="chip" data-i="${i}">${esc(nm(x))}${isObj&&(x.t||x.m)?` <small>${esc(x.t||x.m)}</small>`:''}${isObj?'':' <span class="x">×</span>'}</button>`).join('')}<div class="sugwrap"><input class="in" placeholder="이름 입력 또는 선택 (여러 명 가능)" autocomplete="off"><div class="sug hide"></div></div></div>`;
+    el.innerHTML=`<div class="chips">${a0.map((x,i)=>`<button type="button" class="chip" data-i="${i}">${esc(nm(x))}${isObj&&(x.t||x.m)?` <small>${esc(x.t||x.m)}</small>`:''}${isObj?'':' <span class="x">×</span>'}</button>`).join('')}<div class="sugwrap"><input class="in" ${isPhone()?'readonly inputmode="none" placeholder="＋ 눌러서 이름 선택" style="cursor:pointer;caret-color:transparent"':'placeholder="이름 입력 또는 선택 (여러 명 가능)"'} autocomplete="off"><div class="sug hide"></div></div></div>`;
     $$('.chip',el).forEach(c=>c.onclick=()=>{const i=+c.dataset.i;if(isObj)detail(i);else{const a=arr();a.splice(i,1);save(a);}});
     const inp=$('input',el),sg=$('.sug',el);const opts=namesFor(sid,f.src);
     const add=n=>{n=n.trim();if(!n)return;const a=arr();if(a.some(x=>nm(x)===n)){inp.value='';sg.classList.add('hide');return;}a.push(isObj?{n}:n);this.put(f.k,a);Saver.flush();this.chips(el,f);if(isObj)detail(a.length-1);else if(!isPhone())setTimeout(()=>$('input',el).focus(),0);else document.body.classList.remove('typing');};
     const show=()=>{const q=inp.value.trim();const used=arr().map(nm);const list=opts.filter(o=>!used.includes(o)&&(!q||o.includes(q)));
-      sg.innerHTML=list.map(o=>`<div data-n="${esc(o)}">${esc(o)}</div>`).join('')+(q&&!opts.includes(q)?`<div data-n="${esc(q)}">"${esc(q)}" 직접 추가</div>`:'');sg.classList.toggle('hide',!sg.innerHTML);
-      $$('div',sg).forEach(o=>o.onmousedown=e=>{e.preventDefault();add(o.dataset.n);});};
-    inp.onfocus=show;inp.oninput=show;inp.onblur=()=>setTimeout(()=>sg.classList.add('hide'),150);
+      sg.innerHTML=list.map(o=>`<div data-n="${esc(o)}">${esc(o)}</div>`).join('')+(q&&!opts.includes(q)?`<div data-n="${esc(q)}">"${esc(q)}" 직접 추가</div>`:'');if(!sg.innerHTML&&isPhone())sg.innerHTML='<div style="color:var(--sub)">더 고를 이름이 없습니다</div>';sg.classList.toggle('hide',!sg.innerHTML);
+      $$('div[data-n]',sg).forEach(o=>o.onmousedown=e=>{e.preventDefault();add(o.dataset.n);});};
+    inp.onfocus=show;inp.oninput=show;if(isPhone())inp.onclick=()=>{if(sg.classList.contains('hide'))show();};inp.onblur=()=>setTimeout(()=>sg.classList.add('hide'),150);
     inp.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();const q=inp.value.trim();if(!q)return;const used=arr().map(nm);const mt=opts.filter(o=>!used.includes(o)&&o.includes(q));add(mt.length?mt[0]:q);}};
   },
   drawCheck(){const d=this.doc,body=$('#logBody',this.v),edit=S.edit&&canWrite(this.sid);const c=d.chk||{};
@@ -827,7 +844,7 @@ const Log={
     this.weekRecalc=()=>{const D=this.wds;$$('[data-wc]',body).forEach(el=>{const[fk,x]=el.dataset.wc.split('|');el.textContent=ftext(fmap[fk],D[di(x)]);});$$('[data-wt]',body).forEach(el=>{const[fk,x]=el.dataset.wt.split('|');el.textContent=ftext(fmap[fk],D[di(x)]);});$$('[data-ws]',body).forEach(el=>{el.textContent=this.sumCell(fmap[el.dataset.ws],D);});
       $$('.cell[data-k]',body).forEach(el=>{if(el===document.activeElement)return;const d=D[di(el.dataset.d)],v=d[el.dataset.k];const t=el.dataset.ty;const nv=v==null?'':(t?won(v):String(v));if(el.value!==nv&&!(Saver.q[sid+'|daily_'+el.dataset.d]&&el.dataset.k in Saver.q[sid+'|daily_'+el.dataset.d].ch))el.value=nv;});};
     const grow=el=>{el.style.height='auto';el.style.height=Math.max(34,el.scrollHeight+2)+'px';};
-    $$('.cell[data-k]',body).forEach(el=>{const t=el.dataset.ty,x=el.dataset.d,k=el.dataset.k;if(el.tagName==='TEXTAREA')grow(el);else el.onfocus=()=>el.select();
+    $$('.cell[data-k]',body).forEach(el=>{const t=el.dataset.ty,x=el.dataset.d,k=el.dataset.k;if(el.tagName==='TEXTAREA')grow(el);
       el.oninput=()=>{let v;if(t){v=sumExpr(el.value);if(v==null&&el.value.trim()!==''&&!/^[\d,+\-.\s]*$/.test(el.value))return;}else{v=el.value===''?null:el.value;grow(el);}const d=this.wds[di(x)];Saver.put(sid,'daily_'+x,k,v);setPath(d,k,v);this.weekRecalc();};
       el.onblur=()=>{if(t){const v=sumExpr(el.value);el.value=v==null?'':won(v);}Saver.flush();};
       el.onkeydown=e=>{if(el.tagName==='TEXTAREA'||(e.key!=='Enter'&&e.key!=='ArrowDown'&&e.key!=='ArrowUp'))return;e.preventDefault();const tdc=el.closest('td'),tr=tdc.parentElement,ix=[...tr.children].indexOf(tdc);let r=tr;for(;;){r=e.key==='ArrowUp'?r.previousElementSibling:r.nextElementSibling;if(!r)return;const c=r.children[ix]&&$('input.cell',r.children[ix]);if(c){c.focus();return;}}};});
@@ -1022,7 +1039,7 @@ const Stock={
     this.built=edit;if(!edit)return;
     setTimeout(()=>{const f=this._focusCnt&&$(`input[data-cd="${this._focusCnt}"]`,body);if(f){this._focusCnt=null;toCol(f);f.focus({preventScroll:true});}else if(!this._scrolledT){const t=$('td.tcol',body);if(t)toCol(t);}this._scrolledT=1;},120);
     const cells=$$('input.cell',body);
-    cells.forEach(el=>{el.onfocus=()=>el.select();
+    cells.forEach(el=>{
       el.oninput=()=>{const v=numOrNull(el.value);if(v==null&&el.value.trim()!=='')return;
         if(el.dataset.use){const id=el.dataset.use,last=pad(n);const others=Object.keys(this.doc.d||{}).reduce((a,dd)=>a+(dd===last?0:num(((this.doc.d[dd]||{})[id]||{}).use)),0);this.put(`d/${last}/${id}/use`,v==null?null:Math.round((v-others)*1000)/1000);}
         else this.put(el.dataset.k,v);this.refreshTable(list2);};
@@ -1071,7 +1088,7 @@ const Stock={
       <tr class="tot"><td class="st tot">합계</td><td class="n" data-t="prod">${won(c.tot.prod)}</td><td class="n" data-t="out">${won(c.tot.out)}</td><td class="n" data-t="keep">${won(c.tot.keep)}</td><td class="n" data-t="run">${won(c.run)}</td>${CHAE_CH.map(([k])=>`<td class="n" data-t="${k}">${won(c.tot[k])}</td>`).join('')}</tr></tbody></table></div>`;
     $$('[data-go]',body).forEach(r=>r.onclick=async()=>{await Saver.flush();S.date=r.dataset.go;S.stockView='entry';renderView();});
     this.built=edit;if(!edit)return;
-    $$('input.cell',body).forEach(el=>{el.onfocus=()=>el.select();el.oninput=()=>{const v=numOrNull(el.value);if(v==null&&el.value.trim()!=='')return;this.put(el.dataset.k,v);refresh();};el.onblur=()=>Saver.flush();
+    $$('input.cell',body).forEach(el=>{el.oninput=()=>{const v=numOrNull(el.value);if(v==null&&el.value.trim()!=='')return;this.put(el.dataset.k,v);refresh();};el.onblur=()=>Saver.flush();
       el.onkeydown=e=>{if(e.key!=='Enter'&&e.key!=='ArrowDown'&&e.key!=='ArrowUp')return;e.preventDefault();const tdc=el.closest('td'),tr=tdc.parentElement,ix=[...tr.children].indexOf(tdc);let r=tr;for(;;){r=e.key==='ArrowUp'?r.previousElementSibling:r.nextElementSibling;if(!r)return;const c2=r.children[ix]&&$('input',r.children[ix]);if(c2){c2.focus();return;}}};});
   },
   label(sid,docId,key){if(docId==='unitcfg'){const c=DB.cache[`stores/${sid}/config/inv`]||{};const id=key.split('/')[1];return ((c.items&&c.items[id]&&c.items[id].name)||id)+' · 수량 단위(1/N)';}if(docId==='vendormemo'){const f=key.split('/')[2];return '거래처 메모 · '+({name:'업체명',memo:'내용',_del:'삭제',o:'추가'}[f]||f);}const kind=docId.split('_')[0];const K=KINDS[kind];const p=key.split('/');const cfg=DB.cache[`stores/${sid}/config/${kind}`]||{};const nm=id=>id==='chae'?'채개장':((cfg.items&&cfg.items[id]&&cfg.items[id].name)||id);
