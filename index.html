@@ -281,11 +281,16 @@ table.lq td:nth-child(3):not(.n){font-size:11px;max-width:54px;word-break:break-
 .ibtn.today{background:var(--acc);border-color:var(--acc);color:#2b2000;font-weight:800;box-shadow:0 2px 6px rgba(224,161,0,.35)}
 .ibtn.today:active{transform:translateY(1px)}
 .ibtn.icb{padding:5px 8px;display:inline-flex;align-items:center}
+
+.pmrows{display:grid;gap:6px;margin-bottom:8px}
+.pmrow{display:grid;grid-template-columns:minmax(64px,auto) 1fr auto;gap:8px;align-items:center}
+.pmrow b{white-space:nowrap}
+.pmrow .in{width:100%;min-width:0}
 </style></head>
 <body><div id="app"><div style="padding:40vh 0;text-align:center;color:#7a7166">불러오는 중…</div></div>
 <script src="firebase-config.js"></script>
 <script>const isPhone=()=>Math.min(innerWidth,(window.screen&&screen.width)||innerWidth)<=700; // 넓은 표가 그려지는 순간 innerWidth가 잠깐 커지는 기기가 있어 화면 크기도 함께 본다
-const APP_VER='27'; // 빌드할 때 sw.js의 캐시 번호와 같은 숫자로 채워짐
+const APP_VER='28'; // 빌드할 때 sw.js의 캐시 번호와 같은 숫자로 채워짐
 'use strict';
 const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -810,10 +815,13 @@ const Log={
       modal(`<h2>${esc(p.n)}</h2><div class="f"><label>반근무 내용 (예: 대체반차, 오전, 오후북촌)</label><input id="dv" value="${esc(p.m||'')}"></div><div class="row"><button class="btn bad" id="dDel">삭제</button><button class="btn" id="dOk">확인</button></div>`,(m,close)=>{const inp=$('#dv',m);setTimeout(()=>inp.focus(),50);
         const ok=()=>{p.m=inp.value.trim();close();save(a);};$('#dOk',m).onclick=ok;inp.onkeydown=e=>{if(e.key==='Enter')ok();};$('#dDel',m).onclick=()=>{a.splice(i,1);close();save(a);};});};
     const a0=arr();
-    el.innerHTML=`<div class="chips">${a0.map((x,i)=>`<button type="button" class="chip" data-i="${i}">${esc(nm(x))}${isObj&&(x.t||x.m)?` <small>${esc(x.t||x.m)}</small>`:''}${isObj?'':' <span class="x">×</span>'}</button>`).join('')}<div class="sugwrap"><input class="in" readonly inputmode="none" placeholder="＋ 눌러서 이름 선택" style="cursor:pointer;caret-color:transparent" autocomplete="off"><div class="sug hide"></div></div></div>`;
+    const isM=f.ty==='peopleMemo';
+    el.innerHTML=(isM&&a0.length?`<div class="pmrows">${a0.map((x,i)=>`<div class="pmrow"><b>${esc(x.n)}</b><input class="in" data-pm="${i}" placeholder="비고 (예: 대체반차, 오전, 오후북촌)" value="${esc(x.m||'')}"><button type="button" class="btn ghost sm" data-pmx="${i}" aria-label="삭제">✕</button></div>`).join('')}</div>`:'')+`<div class="chips">${(isM?[]:a0).map((x,i)=>`<button type="button" class="chip" data-i="${i}">${esc(nm(x))}${isObj&&(x.t||x.m)?` <small>${esc(x.t||x.m)}</small>`:''}${isObj?'':' <span class="x">×</span>'}</button>`).join('')}<div class="sugwrap"><input class="in" readonly inputmode="none" placeholder="＋ 눌러서 이름 선택" style="cursor:pointer;caret-color:transparent" autocomplete="off"><div class="sug hide"></div></div></div>`;
+    $$('[data-pm]',el).forEach(inp2=>{inp2.oninput=()=>{const a=arr();a[+inp2.dataset.pm].m=inp2.value;this.put(f.k,a);};inp2.onblur=()=>{const a=arr();const v=inp2.value.trim();if((a[+inp2.dataset.pm].m||'')!==v){a[+inp2.dataset.pm].m=v;this.put(f.k,a);}Saver.flush();};});
+    $$('[data-pmx]',el).forEach(b=>b.onclick=()=>{const a=arr();a.splice(+b.dataset.pmx,1);save(a);});
     $$('.chip',el).forEach(c=>c.onclick=()=>{const i=+c.dataset.i;if(isObj)detail(i);else{const a=arr();a.splice(i,1);save(a);}});
-    const inp=$('input',el),sg=$('.sug',el);const opts=namesFor(sid,f.src);
-    const add=n=>{n=n.trim();if(!n)return;const a=arr();if(a.some(x=>nm(x)===n)){inp.value='';sg.classList.add('hide');return;}a.push(isObj?{n}:n);this.put(f.k,a);Saver.flush();this.chips(el,f);if(isObj)detail(a.length-1);else document.body.classList.remove('typing');if(document.activeElement&&document.activeElement.blur)document.activeElement.blur();};
+    const inp=$('.sugwrap input',el),sg=$('.sug',el);const opts=namesFor(sid,f.src);
+    const add=n=>{n=n.trim();if(!n)return;const a=arr();if(a.some(x=>nm(x)===n)){inp.value='';sg.classList.add('hide');return;}a.push(isObj?{n}:n);this.put(f.k,a);Saver.flush();this.chips(el,f);if(isM){const ni=$(`[data-pm="${a.length-1}"]`,el);if(ni)setTimeout(()=>ni.focus(),30);}else if(isObj)detail(a.length-1);else document.body.classList.remove('typing');if(document.activeElement&&document.activeElement.blur)document.activeElement.blur();};
     const show=()=>{const q=inp.value.trim();const used=arr().map(nm);const list=opts.filter(o=>!used.includes(o)&&(!q||o.includes(q)));
       sg.innerHTML=list.map(o=>`<div data-n="${esc(o)}">${esc(o)}</div>`).join('')+(q&&!opts.includes(q)?`<div data-n="${esc(q)}">"${esc(q)}" 직접 추가</div>`:'');if(!sg.innerHTML)sg.innerHTML='<div style="color:var(--sub)">더 고를 이름이 없습니다</div>';sg.classList.toggle('hide',!sg.innerHTML);
       $$('div[data-n]',sg).forEach(o=>o.onmousedown=e=>{e.preventDefault();add(o.dataset.n);});};
