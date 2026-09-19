@@ -1,5 +1,5 @@
 // 앱 껍데기만 보관합니다. 데이터는 항상 Firebase에서 받아옵니다.
-const C='flowerrice-v10';const SHELL=['./','./index.html','./firebase-config.js','./manifest.json','./icon-192.png','./icon-512.png'];
+const C='flowerrice-v11';const SHELL=['./','./index.html','./firebase-config.js','./manifest.json','./icon-192.png','./icon-512.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(C).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting()));});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==C).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));});
 self.addEventListener('fetch',e=>{const u=new URL(e.request.url);if(e.request.method!=='GET')return;
