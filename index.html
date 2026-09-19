@@ -172,7 +172,7 @@ table.lq td.z{color:#c9c1b3}
 .tw{overflow:visible!important;max-height:none!important}
 table.t thead th{top:var(--hdr2,0px)}
 .tw.xs{overflow-x:auto!important}
-.tw.xs table.t thead th{position:relative;top:auto!important;z-index:5}
+.tw.xs table.t thead th{position:static;top:auto!important}
 .tw.xs table.t thead th.st,.tw.xs table.t td.st{position:sticky;left:0}
 .tw.fit{display:block;width:fit-content;max-width:100%;margin-inline:auto}
 .modal{overscroll-behavior:contain;touch-action:none}.modal .box{overscroll-behavior:contain;touch-action:pan-y}
@@ -215,6 +215,12 @@ table.t th.cnt,table.t td.cnt{background:#eef6ee}
 table.t td.cnt.tcol,table.t th.cnt.tcol{background:#fff4cf}
 table.t th small{font-weight:500;font-size:10.5px}
 tr.todayrow td.ed input{background:#fff4cf}
+
+.fhead{position:sticky;top:var(--hdr2,0px);z-index:20;overflow:hidden;border-radius:var(--r) var(--r) 0 0;border:1px solid var(--line);border-bottom:0;box-sizing:border-box;pointer-events:auto}
+.fhead table.t thead th{position:static!important;top:auto!important}
+.fhead table.t thead th.st{position:sticky!important;left:0;z-index:2}
+.tw.fit{width:fit-content;max-width:100%;margin-inline:auto}
+.tw.fit table.t{width:auto}
 </style></head>
 <body><div id="app"><div style="padding:40vh 0;text-align:center;color:#7a7166">불러오는 중…</div></div>
 <script src="firebase-config.js"></script>
@@ -588,14 +594,20 @@ addEventListener('unhandledrejection',e=>{const m=e&&e.reason&&(e.reason.message
 let _ftT=0;function fitTables(){const h=$('header.top');const hs=h&&getComputedStyle(h).position==='sticky'?h.offsetHeight:0;const dn=$('#view [data-dbar]');const bar=dn&&dn.closest('.bar');if(bar)bar.classList.add('dbar');const R=document.documentElement;R.style.setProperty('--hdr',hs+'px');R.style.setProperty('--hdr2',(hs+(bar?bar.offsetHeight:0))+'px');
   $$('.tw').forEach(tw=>{const t=$('table',tw);if(!t)return;tw.classList.remove('xs');if(t.scrollWidth>tw.clientWidth+2)tw.classList.add('xs');
     const rows=t.tHead?t.tHead.rows:[];if(rows.length>1){const h1=rows[0].offsetHeight;[...rows[1].cells].forEach(c=>c.style.top=`calc(var(--hdr2,0px) + ${h1}px)`);}});
-  stickHeads();
+  buildHeads();
   if(S.scrollToday){const r=$('tr.todayrow');if(r){S.scrollToday=false;setTimeout(()=>{const y=r.getBoundingClientRect().top+scrollY-innerHeight/2;scrollTo({top:Math.max(0,y),behavior:'smooth'});},60);}}}
-// 옆으로 넓은 표는 가로 스크롤 때문에 머리글이 저절로 고정되지 않으므로, 스크롤에 맞춰 머리글을 따라 내려 준다
-function stickHeads(){// 기준은 실제로 화면에 붙어 있는 날짜 줄(없으면 상단 머리)의 아래쪽. 같은 좌표계로 재야 아이패드에서 키보드가 떠도 어긋나지 않는다
-  const ref=$('#view .bar.dbar')||$('header.top');let top=0;if(ref&&getComputedStyle(ref).position==='sticky')top=Math.max(0,ref.getBoundingClientRect().bottom);$$('.tw.xs').forEach(tw=>{const t=$('table',tw);if(!t||!t.tHead)return;const r=t.getBoundingClientRect();const hh=t.tHead.offsetHeight;const dy=Math.round(Math.max(0,Math.min(top-r.top,r.height-hh-36)));
-    if(t._dy===dy)return;t._dy=dy;$$('th',t.tHead).forEach(th=>{th.style.transform=dy?`translateY(${dy}px)`:'';});});}
-let _shR=0;const _shF=()=>{if(_shR)return;_shR=requestAnimationFrame(()=>{_shR=0;stickHeads();});};addEventListener('scroll',_shF,{passive:true});if(window.visualViewport){visualViewport.addEventListener('scroll',_shF);visualViewport.addEventListener('resize',_shF);}
-new MutationObserver(()=>{clearTimeout(_ftT);_ftT=setTimeout(fitTables,40);}).observe(document.documentElement,{childList:true,subtree:true});addEventListener('resize',fitTables);
+// 옆으로 넓은 표는 가로 스크롤 때문에 머리글이 저절로 고정되지 않는다. 머리글만 복사한 줄을 표 위에 두고 그 줄을 브라우저 기본 고정(sticky)으로 붙여서, 스크롤해도 떨어지지 않게 한다
+function buildHeads(){$$('.fhead').forEach(f=>{if(!f.nextElementSibling||!f.nextElementSibling.classList.contains('xs'))f.remove();});
+  $$('.tw.xs').forEach(tw=>{const t=$('table',tw);if(!t||!t.tHead)return;let f=tw.previousElementSibling;if(!f||!f.classList.contains('fhead')){f=document.createElement('div');f.className='fhead';tw.parentNode.insertBefore(f,tw);
+      f.addEventListener('click',e=>{const th=e.target.closest('th');if(!th)return;const all=$$('th',f),i=all.indexOf(th);const o=$$('th',$('table',f.nextElementSibling).tHead)[i];if(o)o.click();});
+      tw.addEventListener('scroll',()=>{f.scrollLeft=tw.scrollLeft;},{passive:true});}
+    const row=[...t.tBodies[0].rows].find(r=>[...r.cells].every(c=>c.colSpan===1));const ws=row?[...row.cells].map(c=>c.getBoundingClientRect().width):null;
+    const sig=t.tHead.innerHTML+'|'+(ws?ws.map(w=>Math.round(w)).join(','):'')+'|'+t.offsetWidth;if(f._sig===sig){f.scrollLeft=tw.scrollLeft;return;}f._sig=sig;
+    const hh=t.tHead.offsetHeight;const c=document.createElement('table');c.className=t.className;c.style.cssText=`width:${t.offsetWidth}px;table-layout:fixed;margin:0`;
+    if(ws){const cg=document.createElement('colgroup');ws.forEach(w=>{const col=document.createElement('col');col.style.width=w+'px';cg.appendChild(col);});c.appendChild(cg);}
+    const th=t.tHead.cloneNode(true);$$('th',th).forEach(x=>{x.style.top='';x.style.transform='';x.style.width='';x.style.minWidth='';x.style.maxWidth='';});if(!ws){const o=$$('th',t.tHead);$$('th',th).forEach((x,i)=>x.style.width=o[i].getBoundingClientRect().width+'px');}
+    [...t.tHead.rows].forEach((r,i)=>th.rows[i].style.height=r.getBoundingClientRect().height+'px');c.appendChild(th);f.innerHTML='';f.appendChild(c);f.style.height=hh+'px';f.style.marginBottom=(-hh)+'px';f.scrollLeft=tw.scrollLeft;});}
+new MutationObserver(rs=>{if(rs.every(r=>(r.target.closest&&r.target.closest('.fhead'))||[...r.addedNodes,...r.removedNodes].every(n=>n.classList&&n.classList.contains('fhead'))&&(r.addedNodes.length+r.removedNodes.length)))return;clearTimeout(_ftT);_ftT=setTimeout(fitTables,40);}).observe(document.documentElement,{childList:true,subtree:true});addEventListener('resize',fitTables);
 // 휴대폰에서 이름 목록이 떠 있는 동안에는 아래 '기록 중 · 완료' 막대를 잠시 숨겨 화면을 넓게 쓴다
 addEventListener('focusin',e=>{if(e.target.matches&&e.target.matches('.sugwrap input'))document.body.classList.add('typing');});
 addEventListener('focusout',()=>setTimeout(()=>{const a=document.activeElement;if(!a||!a.matches||!a.matches('.sugwrap input'))document.body.classList.remove('typing');},200));
@@ -740,7 +752,7 @@ const Log={
     this.bindNotes(body);
     const wr=$('#wkRev',body);if(wr){wr.oninput=()=>Saver.put(sid,'week_'+a,'review',wr.value||null);wr.onblur=()=>Saver.flush();}
   },
-  drawMonth(docs){const sid=this.sid,body=$('#logBody',this.v);const ym=ymOf(S.date);const n=daysIn(ym);const fs=splitPairs(allFields(sid).filter(f=>f.m));const td=today();const mores=allFields(sid).filter(f=>f.more);const cells=[...mores,{k:'notes',l:'특이사항'}];
+  drawMonth(docs){const sid=this.sid,body=$('#logBody',this.v);const ym=ymOf(S.date);const n=daysIn(ym);const fs=splitPairs(allFields(sid).filter(f=>f.m)).map(f=>f.ty==='pnum'&&f.base.ty==='calcpair'?{...f,ms:f.i?'고객수':'테이블'}:f);const td=today();const mores=allFields(sid).filter(f=>f.more);const cells=[...mores,{k:'notes',l:'특이사항'}];
     const days=[...Array(n)].map((_,i)=>`${ym}-${pad(i+1)}`);const ds=days.map(x=>docs['daily_'+x]||{});
     const kp=fs.filter(f=>f.ty!=='people').slice(0,4);
     body.innerHTML=`<div class="kpis">${kp.map(f=>`<div class="kpi"><span>${esc(f.l)} 월 합계</span><b>${this.sumCell(f,ds)||'-'}</b></div>`).join('')}</div>
@@ -858,7 +870,7 @@ const Stock={
     const canCarry=edit&&(DB.me.role==='admin'||!this.prev);const inp=(k,v)=>`<input class="cell" inputmode="decimal" data-k="${k}" value="${v??''}">`;
     if(edit)h+=`<div class="muted" style="margin:4px 2px">칸에 바로 입력하면 자동 저장됩니다. Enter를 누르면 아래 칸으로 이동합니다.</div>`;
     if(!K.price){const run={};list2.forEach(it=>run[it.id]=this.carryOf(it.id));
-      h+=`<div class="tw"><table class="t mt"><thead><tr><th class="st" rowspan="2">날짜</th>${list2.map(it=>`<th colspan="${K.cols.length+1}">${esc(it.name)}</th>`).join('')}</tr><tr>${list2.map(()=>K.cols.map(c=>`<th>${c[1]}</th>`).join('')+'<th class="tot">재고</th>').join('')}</tr></thead><tbody>
+      h+=`<div class="tw fit"><table class="t mt"><thead><tr><th class="st" rowspan="2">날짜</th>${list2.map(it=>`<th colspan="${K.cols.length+1}">${esc(it.name)}</th>`).join('')}</tr><tr>${list2.map(()=>K.cols.map(c=>`<th>${c[1]}</th>`).join('')+'<th class="tot">재고</th>').join('')}</tr></thead><tbody>
       <tr><td class="st">전월이월</td>${list2.map(it=>`<td colspan="${K.cols.length}"></td><td class="n tot ${canCarry?'ed':''}">${canCarry?inp('carryM/'+it.id,this.carryOf(it.id)):won(this.carryOf(it.id))}</td>`).join('')}</tr>
       ${[...Array(n)].map((_,i)=>{const dd=pad(i+1),x=`${this.ym}-${dd}`;return `<tr class="${x===td?'todayrow':''}"><td data-go="${x}" class="st golink wk${dowOf(x)} ${x===td?'today':''}">${i+1}일 (${DOW[dowOf(x)]})</td>${list2.map(it=>{const t=(d[dd]&&d[dd][it.id])||{};run[it.id]+=this.net(t);return K.cols.map(c=>edit?`<td class="n ed">${inp(`d/${dd}/${it.id}/${c[0]}`,t[c[0]])}</td>`:`<td class="n">${t[c[0]]?won(t[c[0]]):''}</td>`).join('')+`<td class="n tot" data-run="${it.id}/${dd}" ${run[it.id]<0?'style="color:var(--bad)"':''}>${won(run[it.id])}</td>`;}).join('')}</tr>`;}).join('')}
       <tr class="tot"><td class="st tot">합계</td>${list2.map(it=>K.cols.map(c=>`<td class="n" data-sum="${it.id}/${c[0]}">${won((all[it.id]||{})[c[0]]||0)}</td>`).join('')+`<td class="n" data-run="${it.id}/end">${won(run[it.id])}</td>`).join('')}</tr></tbody></table></div>`;
