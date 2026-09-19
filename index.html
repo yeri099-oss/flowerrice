@@ -150,6 +150,11 @@ table.t tr.click:hover td{background:#fffbea}
 .items{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:10px}
 .items .item{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:#fffdf8;grid-template-columns:1fr auto;align-content:start}
 .items .item:last-child{border-bottom:1px solid var(--line)}
+
+.lt{display:flex;gap:8px;align-items:flex-start;width:100%;min-width:180px;text-align:left;border:1px dashed var(--acc);background:#fffdf5;border-radius:8px;padding:7px 9px;color:var(--ink);font-size:13px;line-height:1.5}
+.lt span{flex:1;white-space:pre-wrap;word-break:break-word}.lt i{color:var(--sub);font-style:normal}.lt b{color:var(--acc);font-weight:700}
+.item .ins .v{border:1px solid var(--line);border-radius:8px;padding:8px;text-align:right;background:#fff;min-height:36px;font-variant-numeric:tabular-nums;font-weight:600}
+.item .ins .v.z{color:#c9c1b3;font-weight:400}
 </style></head>
 <body><div id="app"><div style="padding:40vh 0;text-align:center;color:#7a7166">불러오는 중…</div></div>
 <script src="firebase-config.js"></script>
@@ -710,8 +715,9 @@ const Stock={
     body.innerHTML=cb+`<div class="card"><h3>${esc(cat.name||'')}<span class="hint">${isToday?'오늘':fmtDate(S.date)} 기준 · ${K.cols.map(c=>c[1]).join(', ')}만 입력하면 재고는 자동 계산됩니다</span></h3>
       ${edit?'<input class="in" id="stQ" placeholder="품목 검색" style="margin-bottom:6px">':''}
       <div class="items">${list.map(it=>{const s=stockAt(it.id);const t=(this.doc.d&&this.doc.d[dd]&&this.doc.d[dd][it.id])||{};
-        return `<div class="item" data-name="${esc(it.name)}"><div class="nm">${esc(it.name)}<small>${esc([it.spec,it.vendor,K.price&&num(this.units[it.id])>1?`수량은 단가 단위의 1/${this.units[it.id]}로 입력`:null].filter(Boolean).join(' · '))}${!edit&&K.cols.some(c=>t[c[0]])?' '+K.cols.filter(c=>t[c[0]]).map(c=>`${c[1]} ${won(t[c[0]])}`).join(' / '):''}</small></div>
+        return `<div class="item" data-name="${esc(it.name)}"><div class="nm">${esc(it.name)}<small>${esc([it.spec,it.vendor,K.price&&num(this.units[it.id])>1?`수량은 단가 단위의 1/${this.units[it.id]}로 입력`:null].filter(Boolean).join(' · '))}</small></div>
         <div class="stk ${s<0?'neg':''}" data-stk="${it.id}">${won(s)}<small>${isToday?'현재 재고':'이날 재고'}</small></div>
+${!edit?`<div class="ins">${K.cols.map(c=>`<div><label>${c[1]}</label><div class="v ${t[c[0]]?'':'z'}">${t[c[0]]?won(t[c[0]]):'-'}</div></div>`).join('')}${K.count?`<div><label>${cat.noPrice?'이달 수량':'월말 실사재고'}</label><div class="v ${this.doc.count&&this.doc.count[it.id]!=null?'':'z'}">${this.doc.count&&this.doc.count[it.id]!=null?won(this.doc.count[it.id]):'-'}</div></div>`:''}</div>`:''}
         ${edit?`<div class="ins">${K.cols.map(c=>`<div><label>${c[1]}</label><input inputmode="decimal" data-k="d/${dd}/${it.id}/${c[0]}" value="${t[c[0]]??''}"></div>`).join('')}${K.count&&!cat.noPrice?`<div><label>월말 실사재고</label><input inputmode="decimal" data-k="count/${it.id}" value="${(this.doc.count&&this.doc.count[it.id])??''}"></div>`:''}${K.price&&!cat.noPrice?`<div><label>수량 단위</label><select data-unit="${it.id}" style="width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 4px;background:#fff"><option value="1">단가와 같은 단위</option><option value="100" ${num(this.units[it.id])===100?'selected':''}>g 입력, 단가는 100g 기준</option><option value="1000" ${num(this.units[it.id])===1000?'selected':''}>g(ml) 입력, 단가는 1kg(1L) 기준</option></select></div>`:''}${K.count&&cat.noPrice?`<div><label>이달 수량</label><input inputmode="decimal" data-k="count/${it.id}" value="${(this.doc.count&&this.doc.count[it.id])??''}"></div>`:''}</div>`:''}</div>`;}).join('')||'<div class="muted">이 분류에 품목이 없습니다.</div>'}</div></div>`;
     this.bindCat(body);this.built=edit;if(!edit)return;
     $$('input[data-k]',body).forEach(el=>{el.oninput=()=>{const n=numOrNull(el.value);if(n==null&&el.value.trim()!=='')return;this.put(el.dataset.k,n);this.drawEntry(items);};el.onblur=()=>Saver.flush();});
@@ -780,11 +786,16 @@ const Stock={
 // ===== 현금출납장 =====
 const CASH_VIEWS=[['cashb','현금출납장'],['card','체크카드결제'],['dep','매출현금입금'],['prepaid','선결제'],['sum','내역서정리']];
 const CASH_COLS={
-  cashb:[{k:'d',l:'일자',ty:'date'},{k:'desc',l:'적요',ty:'text',w:1},{k:'in',l:'수입',ty:'money'},{k:'out',l:'지출',ty:'money'}],
-  card:[{k:'d',l:'일자',ty:'date'},{k:'desc',l:'내역',ty:'text'},{k:'vendor',l:'거래처',ty:'text'},{k:'in',l:'입금',ty:'money'},{k:'out',l:'지출금액',ty:'money'},{k:'memo',l:'비고',ty:'text',w:1}],
+  cashb:[{k:'d',l:'일자',ty:'date'},{k:'desc',l:'적요',ty:'text',w:1,long:1},{k:'in',l:'수입',ty:'money'},{k:'out',l:'지출',ty:'money'}],
+  card:[{k:'d',l:'일자',ty:'date'},{k:'desc',l:'내역',ty:'text'},{k:'vendor',l:'거래처',ty:'text'},{k:'in',l:'입금',ty:'money'},{k:'out',l:'지출금액',ty:'money'},{k:'memo',l:'비고',ty:'text',w:1,long:1}],
   sum:[{k:'kind',l:'종류',ty:'text'},{k:'desc',l:'내역',ty:'text',w:1},{k:'vendor',l:'거래처',ty:'text'},{k:'in',l:'입금액',ty:'money'},{k:'out',l:'지출금액',ty:'money'},{k:'memo',l:'비고',ty:'text'}],
-  prepaid:[{k:'d',l:'날짜',ty:'date'},{k:'name',l:'이름',ty:'text'},{k:'phone',l:'연락처',ty:'text'},{k:'pay',l:'결제액',ty:'money'},{k:'add',l:'추가 결제액',ty:'money'},{k:'use',l:'사용액',ty:'money'},{k:'done',l:'완료',ty:'check'},{k:'memo',l:'비고',ty:'text',w:1}]
+  prepaid:[{k:'d',l:'날짜',ty:'date'},{k:'name',l:'이름',ty:'text'},{k:'phone',l:'연락처',ty:'text'},{k:'pay',l:'결제액',ty:'money'},{k:'add',l:'추가 결제액',ty:'money'},{k:'use',l:'사용액',ty:'money'},{k:'done',l:'완료',ty:'check'},{k:'memo',l:'비고',ty:'text',w:1,long:1}]
 };
+// 긴 글 칸: 누르면 큰 입력 창이 뜬다
+function longBtn(k,v,label){return `<button type="button" class="lt" data-lt="${k}" data-ll="${esc(label)}"><span>${v?esc(v):'<i>눌러서 입력</i>'}</span><b>✎</b></button>`;}
+function bindLong(body,getDoc,save){$$('[data-lt]',body).forEach(b=>b.onclick=()=>{const k=b.dataset.lt;const cur=getPath(getDoc(),k)||'';
+  modal(`<h2>${esc(b.dataset.ll)}</h2><textarea id="ltV" class="in" style="width:100%;min-height:45vh;line-height:1.6;font-size:16px">${esc(cur)}</textarea><div class="row"><button class="btn ghost" data-close>취소</button><button class="btn" id="ltOk">확인</button></div>`,(m,close)=>{const ta=$('#ltV',m);setTimeout(()=>{ta.focus();ta.setSelectionRange(ta.value.length,ta.value.length);},80);
+    $('#ltOk',m).onclick=()=>{const v=ta.value.trim()===''?null:ta.value;save(k,v);$('span',b).innerHTML=v?esc(v):'<i>눌러서 입력</i>';close();};});});}
 const Cash={
   render(v,sid){this.v=v;this.sid=sid;const ym=ymOf(S.date);this.ym=ym;this.docId='cash_'+ym;const view=S.cashView;const coll=`stores/${sid}/data`;
     v.innerHTML=`<div class="bar"><div class="seg" style="flex-wrap:wrap">${CASH_VIEWS.map(([k,l])=>`<button data-cv="${k}" class="${view===k?'on':''}">${l}</button>`).join('')}</div></div>
@@ -828,6 +839,7 @@ const Cash={
       const k=`${sec}/${r.id}/${c.k}`;if(c.ty==='check')return `<td style="text-align:center"><input type="checkbox" style="width:22px;height:22px" data-k="${k}" data-ty="check" ${v?'checked':''}></td>`;
       if(c.ty==='date')return `<td><input type="date" style="width:132px;text-align:left" data-k="${k}" data-ty="date" value="${esc(v||'')}"></td>`;
       if(c.ty==='money')return `<td><input inputmode="numeric" style="width:96px" data-k="${k}" data-ty="money" value="${v==null?'':won(v)}"></td>`;
+      if(c.long)return `<td class="txt">${longBtn(k,v,c.l)}</td>`;
       return `<td><input class="w" style="${c.w?'width:220px':''}" data-k="${k}" data-ty="text" value="${esc(v||'')}"></td>`;};
     const extraH=view==='cashb'?`<th class="tot">잔액(시재 포함)</th><th class="tot">잔액</th>`:view==='prepaid'?'<th class="tot">잔액</th>':'';
     const extra=r=>view==='cashb'?`<td class="n tot" data-r1="${r.id}"></td><td class="n tot" data-r2="${r.id}"></td>`:view==='prepaid'?`<td class="n tot" data-r1="${r.id}"></td>`:'';
@@ -843,6 +855,7 @@ const Cash={
       ${view==='sum'?`<div class="kpis" style="margin-top:10px"><div class="kpi"><span>이월금액 ${canCarry?'(수정 가능)':''}</span>${canCarry?`<input class="in num" data-k="carryM/sum" data-ty="money" value="${won(this.carry('sum'))}">`:'<b id="sCarry"></b>'}</div><div class="kpi"><span>입금합계</span><b id="sIn"></b></div><div class="kpi"><span>지출합계</span><b id="sOut"></b></div><div class="kpi"><span>이월잔액</span><b id="sEnd"></b></div></div>`:''}
       ${view==='cashb'?'<div class="muted" style="margin-top:6px">전월 잔액은 자동으로 이월됩니다. 잔액은 수입과 지출을 적으면 바로 계산됩니다.</div>':''}`;
     this.built=sig;calc();if(!edit)return;
+    bindLong(body,cur,(k,v)=>{this.put(docId,cur(),k,v);Saver.flush();});
     $$('input[data-k]',body).forEach(el=>{const t=el.dataset.ty;const fire=()=>{let v;if(t==='check')v=el.checked||null;else if(t==='money'){v=sumExpr(el.value);if(v==null&&el.value.trim()!=='')return;}else v=el.value===''?null:el.value;this.put(docId,cur(),el.dataset.k,v);calc();};
       el.oninput=fire;el.onchange=()=>{fire();if(t==='date'||t==='check')Saver.flush();};el.onblur=()=>{if(t==='money'){const v=sumExpr(el.value);el.value=v==null?'':won(v);}Saver.flush();};});
     $$('[data-del]',body).forEach(b=>b.onclick=async()=>{if(!await confirmBox('이 행을 삭제할까요?\n삭제해도 변경이력에 남아 관리자가 복구할 수 있습니다.','삭제'))return;this.put(docId,cur(),`${sec}/${b.dataset.del}/_del`,true);await Saver.flush();this.built=false;this.draw();});
@@ -853,12 +866,14 @@ const Cash={
       const set=(id,v)=>{const e=$('#'+id,body);if(e)e.textContent=won(v);};set('dS',ts);set('dB',tb);set('dX',tx);set('dGap',ts-tb);};
     if(this.built==='dep'&&edit){calc();return;}
     const inp=(dd,k,ty,w)=>{const v=(dep[dd]||{})[k];if(!edit)return ty==='money'?`<td class="n">${won(v)}</td>`:ty==='date'?`<td>${v?(+v.slice(5,7))+'/'+(+v.slice(8)):''}</td>`:`<td class="txt">${esc(v||'')}</td>`;
+      if(ty==='text')return `<td class="txt">${longBtn(`dep/${dd}/${k}`,v,k==='xferDesc'?`${+dd}일 · 계좌이체내용`:`${+dd}일 · 계좌이체 금액 사용날짜 및 내역`)}</td>`;
       return `<td><input ${ty==='date'?'type="date" style="width:132px;text-align:left"':ty==='money'?'inputmode="numeric" style="width:96px"':`class="w" style="width:${w||180}px"`} data-k="dep/${dd}/${k}" data-ty="${ty}" value="${ty==='money'?(v==null?'':won(v)):esc(v||'')}"></td>`;};
     body.innerHTML=`<div class="kpis"><div class="kpi"><span>현금매출 합계</span><b id="dS"></b></div><div class="kpi"><span>은행입금 합계</span><b id="dB"></b></div><div class="kpi"><span>미입금 현금</span><b id="dGap"></b></div><div class="kpi"><span>계좌이체 합계</span><b id="dX"></b></div></div>
       <div class="muted" style="margin:8px 2px">현금매출은 업무일지의 현금 금액을 자동으로 가져옵니다.</div>
       <div class="tw"><table class="t"><thead><tr><th class="st">매출일</th><th>현금매출</th><th>은행입금일</th><th>은행입금액</th><th class="tot">입금누계</th><th>계좌이체내용</th><th>이체총금액</th><th>계좌이체 금액 사용날짜 및 내역</th></tr></thead><tbody>
       ${[...Array(n)].map((_,i)=>{const dd=pad(i+1),x=`${this.ym}-${dd}`,dl=this.dailies['daily_'+x];return `<tr><td class="st wk${dowOf(x)}">${+this.ym.slice(5)}월 ${i+1}일</td><td class="n">${dl&&dl.cash!=null?won(dl.cash):''}</td>${inp(dd,'bankDate','date')}${inp(dd,'bankAmt','money')}<td class="n tot" data-run="${dd}"></td>${inp(dd,'xferDesc','text',220)}${inp(dd,'xferAmt','money')}${inp(dd,'useMemo','text',240)}</tr>`;}).join('')}</tbody></table></div>`;
     this.built='dep';calc();if(!edit)return;
+    bindLong(body,()=>this.doc,(k,v)=>{this.put(this.docId,this.doc,k,v);Saver.flush();});
     $$('input[data-k]',body).forEach(el=>{const t=el.dataset.ty;const fire=()=>{let v;if(t==='money'){v=sumExpr(el.value);if(v==null&&el.value.trim()!=='')return;}else v=el.value===''?null:el.value;this.put(this.docId,this.doc,el.dataset.k,v);calc();};
       el.oninput=fire;el.onchange=fire;el.onblur=()=>{if(t==='money'){const v=sumExpr(el.value);el.value=v==null?'':won(v);}Saver.flush();};});
   },
