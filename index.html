@@ -243,6 +243,18 @@ table.t textarea.cell{width:100%;min-width:110px;box-sizing:border-box;border:0;
 table.t.wk td.n input.cell{min-width:80px}
 table.t.mt.wk td.n,table.t.mt.wk thead tr:nth-child(2) th{width:auto;min-width:88px;max-width:none}
 @media(max-width:700px){.daywrap .kpis{grid-template-columns:1fr}}
+
+/* 상단 메뉴: 1단은 글자 메뉴에 선택된 것만 옅은 알약, 2단은 흰 캡슐 안에 밑줄 표시 */
+.tabs{gap:6px;margin-top:6px;padding-bottom:8px}
+.tabs button{border-radius:10px;border-bottom:0;padding:8px 16px;font-size:15px;color:#4a443b;font-weight:600}
+.tabs button.on{background:#f3e3b8;color:var(--accink,#6b4a00);border:0}
+header.top{border-bottom:0}
+#subTabs,.subtabs.cap{width:fit-content;max-width:100%;margin:2px auto 12px;background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:0 2px 8px rgba(60,40,0,.07);padding:0 12px;gap:2px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+#subTabs::-webkit-scrollbar,.subtabs.cap::-webkit-scrollbar{display:none}
+#subTabs:empty{display:none}
+#subTabs button,.subtabs.cap button{border:0;background:transparent;border-radius:0;padding:12px 18px 10px;border-bottom:3px solid transparent;color:#4a443b;font-weight:600;white-space:nowrap;font-size:15px}
+#subTabs button.on,.subtabs.cap button.on{background:transparent;color:var(--accink,#6b4a00);border-bottom-color:var(--acc);font-weight:800}
+@media(max-width:520px){#subTabs button,.subtabs.cap button{padding:10px 12px 8px;font-size:14px}.tabs button{padding:7px 12px;font-size:14px}}
 </style></head>
 <body><div id="app"><div style="padding:40vh 0;text-align:center;color:#7a7166">불러오는 중…</div></div>
 <script src="firebase-config.js"></script>
@@ -1181,7 +1193,7 @@ const Hist={
 // ===== 관리자 =====
 const Admin={
   render(v){const tabs=[['org','직원 · 조직도'],['stores','사업장 설정'],['items','품목 관리'],['import','엑셀 등록'],['backup','백업']];
-    v.innerHTML=`<div class="subtabs">${tabs.map(([k,l])=>`<button data-a="${k}" class="${S.admTab===k?'on':''}">${l}</button>`).join('')}</div><div id="aBody"></div>`;
+    v.innerHTML=`<div class="subtabs cap">${tabs.map(([k,l])=>`<button data-a="${k}" class="${S.admTab===k?'on':''}">${l}</button>`).join('')}</div><div id="aBody"></div>`;
     $$('[data-a]',v).forEach(b=>b.onclick=()=>{S.admTab=b.dataset.a;renderView();});
     const b=$('#aBody',v);({org:()=>this.org(b),stores:()=>this.stores(b),items:()=>this.items(b),import:()=>Importer.render(b),backup:()=>this.backup(b)})[S.admTab]();},
   // --- 직원 · 조직도 ---
