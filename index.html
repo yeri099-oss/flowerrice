@@ -267,14 +267,18 @@ const STORES={
 };
 const STORE_IDS=Object.keys(STORES);
 const ROLE_L={admin:'관리자',exec:'임원',staff:'직원'};
-const EMP_L={regular:'정규직',hourly:'시급직',helper:'주방보조'};
+const EMP_L={regular:'정규직',hourly:'시급직',helper:'주방보조',shared:'사업장 공용 (노트북)'};
 const TAB_L={log:'업무일지',stock:'재고조사',chae:'채개장재고표',cash:'현금출납장'};
 
 // ===== 데이터 계층: Firebase(실사용) / 메모리(데모) 공통 인터페이스 =====
 const EMAIL_DOMAIN='@flowerrice.example.com';
 const ADMIN_ID='yeriberry', INIT_PW='123456';
 const nameKey=n=>[...new TextEncoder().encode(String(n).normalize('NFC').trim())].map(b=>b.toString(16).padStart(2,'0')).join('');
-const DB={mode:'demo',cache:{},me:null,_sess:{},_authCb:null,
+const DB={mode:'demo',cache:{},me:null,_sess:{},_authCb:null,actor:null,
+  // 사업장 공용(노트북) 계정은 오늘의 작성자를 골라서 기록한다
+  isShared(){return !!(this.me&&this.me.role==='staff'&&this.me.empType==='shared');},
+  who(){return this.isShared()?(this.actor||this.me.name):(this.me?this.me.name:'');},
+  whoFull(){return this.isShared()&&this.actor?`${this.actor} (${this.me.name})`:(this.me?this.me.name:'');},
   dataPath:(sid,docId)=>`stores/${sid}/data/${docId}`,
   sess(sid,docId){const k=sid+'/'+docId;let s=this._sess[k];if(!s||Date.now()-s.t>30*60000){s=this._sess[k]={hid:rid()+rid(),seen:new Set(),fresh:true,t:Date.now()};}s.t=Date.now();return s;},
   endSession(){this._sess={};},
@@ -302,7 +306,7 @@ const DB={mode:'demo',cache:{},me:null,_sess:{},_authCb:null,
       if(!s.seen.has(k)){before[k]=old===undefined?null:clone(old);s.seen.add(k);}
       after[k]=changes[k];setPath(nested,k,changes[k]);}
     if(!Object.keys(after).length)return false;
-    const h={sid,docId,docKey:sid+'/'+docId,by:this.me.uid,byName:this.me.name,after};
+    const h={sid,docId,docKey:sid+'/'+docId,by:this.me.uid,byName:DB.whoFull(),after};
     if(Object.keys(before).length)h.before=before;
     if(note)h.note=note;
     const fresh=s.fresh;s.fresh=false;
@@ -450,7 +454,7 @@ const myStores=()=>DB.me.role==='staff'?STORE_IDS.filter(s=>s===DB.me.storeId):S
 const storeCfg=sid=>CFG[sid]||{};
 const tabsOf=sid=>({...STORES[sid].tabs,...(storeCfg(sid).tabs||{})});
 function namesFor(sid,src){
-  const us=Object.values(USERS).filter(u=>u.active!==false&&u.role==='staff'&&u.storeId===sid);
+  const us=Object.values(USERS).filter(u=>u.active!==false&&u.role==='staff'&&u.storeId===sid&&u.empType!=='shared');
   let a=[];
   if(src==='regular')a=us.filter(u=>u.empType==='regular').map(u=>u.name);
   else if(src==='hourly')a=us.filter(u=>u.empType==='hourly').map(u=>u.name);
@@ -467,7 +471,7 @@ const Saver={q:{},timer:null,state:'',
   put(sid,docId,key,val,note){const k=sid+'|'+docId;(this.q[k]=this.q[k]||{sid,docId,ch:{},note}).ch[key]=val;this.set('pending');clearTimeout(this.timer);this.timer=setTimeout(()=>this.flush(),1200);},
   async flush(now){clearTimeout(this.timer);if(!now)await new Promise(r=>setTimeout(r,0));const q=this.q;this.q={};const ks=Object.keys(q);if(!ks.length)return;
     try{for(const k of ks){const{sid,docId,ch,note}=q[k];
-      if(docId.startsWith('daily_')&&DB.me){const cur=DB.cache[DB.dataPath(sid,docId)]||{};const w=cur.writers||[];if(!w.includes(DB.me.name)&&!('writers' in ch))ch.writers=[...w,DB.me.name];}
+      if(docId.startsWith('daily_')&&DB.me&&!(DB.isShared()&&!DB.actor)){const cur=DB.cache[DB.dataPath(sid,docId)]||{};const w=cur.writers||[];const me=DB.who();if(!w.includes(me)&&!('writers' in ch))ch.writers=[...w,me];}
       await DB.commit(sid,docId,ch,note);}
       this.set('saved');}catch(e){console.error(e);this.set('error');toast('저장 중 오류가 났습니다. 네트워크를 확인해 주세요.',3500);}},
   set(st){this.state=st;const el=$('#saveSt');if(!el)return;const d=new Date();
@@ -503,11 +507,12 @@ function pwForm(force){
 function renderMain(){clearAll();
   if(DB.me.mustChangePw)return pwForm(true);
   const stores=myStores();
-  if(!S.store||(!stores.includes(S.store)&&!['_admin','_hist'].includes(S.store)))S.store=stores[0]||(DB.me.role==='admin'?'_admin':null);
+  if(!S.store||(!stores.includes(S.store)&&!((S.store==='_admin'&&DB.me.role==='admin')||(S.store==='_hist'&&canSeeHist()))))S.store=stores[0]||(DB.me.role==='admin'?'_admin':null);
   if(!S.store){root().innerHTML=`<div class="login card"><h2>사업장 미배치</h2><p>아직 사업장에 배치되지 않았습니다. 관리자에게 문의해 주세요.</p><button class="btn ghost" id="lo">로그아웃</button></div>`;$('#lo').onclick=()=>DB.logout();return;}
   root().innerHTML=`<header class="top"><div class="brand"><h1>꽃밥이야기<small id="stSub"></small></h1>
-    <div class="who"><b>${esc(DB.me.name)}</b><button class="ibtn" id="menuBtn">☰</button></div></div>
+    <div class="who"><b>${esc(DB.me.name)}</b>${DB.isShared()?'<button class="ibtn" id="actBtn" style="font-size:12px;padding:5px 9px"></button>':''}<button class="ibtn" id="menuBtn">☰</button></div></div>
     <nav class="tabs" id="storeTabs"></nav></header><div id="subTabs" class="subtabs"></div><main id="view"></main><div id="floats"></div>`;
+  loadActor();const ab0=$('#actBtn');if(ab0){const lab=()=>ab0.textContent=DB.actor?'작성자: '+DB.actor:'작성자 선택';lab();ab0.onclick=async()=>{await Saver.flush();await pickActor(true);lab();};window._actLab=lab;}
   $('#menuBtn').onclick=()=>modal(`<h2>${esc(DB.me.name)}</h2><div style="display:grid;gap:8px"><button class="btn ghost" id="mPw">비밀번호 변경</button><button class="btn ghost" id="mInst">휴대폰에 앱으로 설치하는 방법</button><button class="btn bad" id="mOut">로그아웃</button></div><div class="row"><button class="btn ghost" data-close>닫기</button></div>`,(m,close)=>{
     $('#mPw',m).onclick=()=>{close();pwForm(false);};$('#mOut',m).onclick=()=>{close();DB.logout();};
     $('#mInst',m).onclick=()=>{close();modal(`<h2>앱으로 설치</h2><div style="line-height:1.8">아이폰: 사파리로 접속 → 아래 공유 버튼 → 홈 화면에 추가<br>갤럭시: 크롬으로 접속 → 오른쪽 위 점 세 개 → 앱 설치(또는 홈 화면에 추가)<br>PC 크롬: 주소창 오른쪽의 설치 아이콘</div><div class="row"><button class="btn" data-close>확인</button></div>`);};});
@@ -545,8 +550,15 @@ function tap(el,fn){let running=false;const run=async e=>{if(e.type==='pointerdo
 function pickDay(title,days,docsHas,extra){return new Promise(res=>{const td=today();modal(`<h2>${title}</h2><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(${days.length>7?'64':'120'}px,1fr));gap:6px">${days.map(d=>`<button class="ibtn" data-d="${d}" style="padding:10px 4px;${d===td?'border-color:var(--acc);background:var(--acc2);':''}${d>td?'opacity:.45;':''}"><b>${+d.slice(8)}일</b> <span class="wk${dowOf(d)}" style="font-size:12px">${DOW[dowOf(d)]}</span>${docsHas&&docsHas(d)?'<div style="font-size:11px;color:var(--ok)">기록 있음</div>':'<div style="font-size:11px;color:var(--sub)">&nbsp;</div>'}</button>`).join('')}</div>${extra||''}<div class="row"><button class="btn ghost" data-close id="pdX">취소</button></div>`,(m,close)=>{$$('[data-d]',m).forEach(b=>b.onclick=()=>{close();res(b.dataset.d);});const ex=$('#pdExtra',m);if(ex)ex.onclick=()=>{close();res('__extra');};$('#pdX',m).onclick=()=>{close();res(null);};});});}
 const monthDays=ym=>[...Array(daysIn(ym))].map((_,i)=>`${ym}-${pad(i+1)}`);
 // 기록하기 / 완료 버튼
+// ---- 공용 계정: 오늘의 작성자 (그날 하루 동안 이 기기에 기억)
+function loadActor(){DB.actor=null;if(!DB.isShared())return;try{const a=JSON.parse(localStorage.getItem('fr_actor')||'null');if(a&&a.uid===DB.me.uid&&a.date===today()&&namesFor(DB.me.storeId,'all').concat(storeCfg(DB.me.storeId).helpers||[]).includes(a.name))DB.actor=a.name;}catch(e){}}
+function pickActor(force){return new Promise(res=>{if(!DB.isShared()||(DB.actor&&!force)){res(true);return;}const sid=DB.me.storeId;const us=Object.values(USERS).filter(u=>u.active!==false&&u.role==='staff'&&u.storeId===sid&&u.empType!=='shared');
+  const grp=[['regular','정규직'],['hourly','시급직'],['helper','주방보조']].map(([k,l])=>[l,us.filter(u=>u.empType===k).map(u=>u.name).sort((a,b)=>a.localeCompare(b,'ko'))]).filter(g=>g[1].length);
+  let done=false;modal(`<h2>오늘의 작성자</h2><div class="muted" style="margin-bottom:10px">지금 기록하는 분의 이름을 눌러 주세요. 오늘 하루 동안 기억하고, 위쪽 이름 옆 버튼으로 언제든 바꿀 수 있습니다.</div>${grp.length?grp.map(([l,ns])=>`<div class="muted" style="margin:10px 0 6px;font-weight:700">${l}</div><div style="display:flex;flex-wrap:wrap;gap:8px">${ns.map(n=>`<button class="btn ${DB.actor===n?'':'ghost'}" data-an="${esc(n)}" style="min-width:88px">${esc(n)}</button>`).join('')}</div>`).join(''):'<div class="note">이 사업장에 등록된 직원이 없습니다. 관리자에게 직원 계정 등록을 요청해 주세요.</div>'}<div class="row"><button class="btn ghost" id="cN">취소</button></div>`,(m,close)=>{
+    $$('[data-an]',m).forEach(b=>b.onclick=()=>{DB.actor=b.dataset.an;DB._sess={};try{localStorage.setItem('fr_actor',JSON.stringify({uid:DB.me.uid,date:today(),name:DB.actor}));}catch(e){}done=true;close();if(window._actLab)window._actLab();res(true);});
+    $('#cN',m).onclick=()=>{close();if(!done)res(false);};});});}
 function renderFloats(){const f=$('#floats');if(!f)return;if(!STORES[S.store]||!canWrite(S.store)){f.innerHTML='';return;}
-  if(!S.edit){f.innerHTML=`<button class="btn acc fab" id="goEdit">✎ 기록하기</button>`;tap($('#goEdit'),async()=>{
+  if(!S.edit){f.innerHTML=`<button class="btn acc fab" id="goEdit">✎ 기록하기</button>`;tap($('#goEdit'),async()=>{if(!(await pickActor()))return;
       if(S.tab==='log'&&(S.view==='week'||S.view==='month')){const days=S.view==='week'?(()=>{const[a]=weekRange(S.store,S.date);return[...Array(7)].map((_,i)=>addDays(a,i));})():monthDays(ymOf(S.date));
         const d=await pickDay('어느 날짜를 기록할까요?',days,x=>{const dc=Log.docs&&Log.docs['daily_'+x];return dc&&Object.keys(dc).some(k=>!k.startsWith('_')&&k!=='writers');});if(!d)return;S.ret=S.view;S.date=d;S.view='day';}
       else if(S.tab==='stock'&&S.stockView==='table'){/* 월간표는 그 자리에서 바로 입력 */}
@@ -579,9 +591,10 @@ let _ftT=0;function fitTables(){const h=$('header.top');const hs=h&&getComputedS
   stickHeads();
   if(S.scrollToday){const r=$('tr.todayrow');if(r){S.scrollToday=false;setTimeout(()=>{const y=r.getBoundingClientRect().top+scrollY-innerHeight/2;scrollTo({top:Math.max(0,y),behavior:'smooth'});},60);}}}
 // 옆으로 넓은 표는 가로 스크롤 때문에 머리글이 저절로 고정되지 않으므로, 스크롤에 맞춰 머리글을 따라 내려 준다
-function stickHeads(){const top=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hdr2'))||0;$$('.tw.xs').forEach(tw=>{const t=$('table',tw);if(!t||!t.tHead)return;const r=t.getBoundingClientRect();const hh=t.tHead.offsetHeight;const dy=Math.round(Math.max(0,Math.min(top-r.top,r.height-hh-36)));
+function stickHeads(){// 기준은 실제로 화면에 붙어 있는 날짜 줄(없으면 상단 머리)의 아래쪽. 같은 좌표계로 재야 아이패드에서 키보드가 떠도 어긋나지 않는다
+  const ref=$('#view .bar.dbar')||$('header.top');let top=0;if(ref&&getComputedStyle(ref).position==='sticky')top=Math.max(0,ref.getBoundingClientRect().bottom);$$('.tw.xs').forEach(tw=>{const t=$('table',tw);if(!t||!t.tHead)return;const r=t.getBoundingClientRect();const hh=t.tHead.offsetHeight;const dy=Math.round(Math.max(0,Math.min(top-r.top,r.height-hh-36)));
     if(t._dy===dy)return;t._dy=dy;$$('th',t.tHead).forEach(th=>{th.style.transform=dy?`translateY(${dy}px)`:'';});});}
-let _shR=0;addEventListener('scroll',()=>{if(_shR)return;_shR=requestAnimationFrame(()=>{_shR=0;stickHeads();});},{passive:true});
+let _shR=0;const _shF=()=>{if(_shR)return;_shR=requestAnimationFrame(()=>{_shR=0;stickHeads();});};addEventListener('scroll',_shF,{passive:true});if(window.visualViewport){visualViewport.addEventListener('scroll',_shF);visualViewport.addEventListener('resize',_shF);}
 new MutationObserver(()=>{clearTimeout(_ftT);_ftT=setTimeout(fitTables,40);}).observe(document.documentElement,{childList:true,subtree:true});addEventListener('resize',fitTables);
 // 휴대폰에서 이름 목록이 떠 있는 동안에는 아래 '기록 중 · 완료' 막대를 잠시 숨겨 화면을 넓게 쓴다
 addEventListener('focusin',e=>{if(e.target.matches&&e.target.matches('.sugwrap input'))document.body.classList.add('typing');});
@@ -711,7 +724,7 @@ const Log={
   },
   drawCheck(){const d=this.doc,body=$('#logBody',this.v),edit=S.edit&&canWrite(this.sid);const c=d.chk||{};
     body.innerHTML=this.meta(d)+CHECKS.secs.map(([sk,st])=>`<div class="card"><h3>${st}</h3>${CHECKS.items.map((it,i)=>{const v=c[sk]&&c[sk][i+1];return `<label class="chk"><input type="checkbox" data-c="${sk}/${i+1}" ${v?'checked':''} ${edit?'':'disabled'}><span style="flex:1">${i+1}. ${esc(it)}</span>${v?`<span class="tag r">✓ ${esc(v)}</span>`:''}</label>`;}).join('')}</div>`).join('')+`<div class="note">${esc(CHECKS.note)}</div>${edit?'':'<div class="muted">체크하려면 아래 기록하기 버튼을 눌러 주세요.</div>'}`;
-    $$('[data-c]',body).forEach(el=>el.onchange=()=>{const now=new Date();Saver.put(this.sid,'daily_'+S.date,'chk/'+el.dataset.c,el.checked?`${DB.me.name} ${pad(now.getHours())}:${pad(now.getMinutes())}`:null);Saver.flush();});
+    $$('[data-c]',body).forEach(el=>el.onchange=()=>{const now=new Date();Saver.put(this.sid,'daily_'+S.date,'chk/'+el.dataset.c,el.checked?`${DB.who()} ${pad(now.getHours())}:${pad(now.getMinutes())}`:null);Saver.flush();});
   },
   sumCell(f,list){if(f.nosum)return'';
     if(['money','int','calc','pnum'].includes(f.ty)){let any=false,s=0;list.forEach(d=>{const v=fval(f,d);if(v!=null&&v!==''){any=true;s+=num(v);}});return any?won(s):'';}
@@ -738,7 +751,7 @@ const Log={
   },
   bindNotes(body){$$('[data-note]',body).forEach(c=>c.onclick=()=>this.noteModal(c.dataset.note,c.dataset.nk||'notes'));},
   noteModal(date,key='notes'){const sid=this.sid;const L=key==='notes'?'특이사항':((allFields(sid).find(f=>f.k===key)||{}).l||key);const cur=()=>((this.docs||{})['daily_'+date]||{});const can=canWrite(sid);
-    const view=()=>{const d=cur();const close=modal(`<h2>${fmtDate(date)} ${L}</h2>${d._byName?`<div class="muted" style="margin-bottom:8px">작성자: ${esc((d.writers||[]).join(', ')||d._byName)}</div>`:''}<div style="white-space:pre-wrap;word-break:break-word;line-height:1.7;font-size:15px;min-height:80px">${d[key]?esc(d[key]):'<span class="muted">기록된 내용이 없습니다.</span>'}</div><div class="row">${can?'<button class="btn ghost" id="nEdit">수정</button>':''}<button class="btn" data-close>닫기</button></div>`,(m,cl)=>{const e=$('#nEdit',m);if(e)e.onclick=()=>{cl();edit();};});};
+    const view=()=>{const d=cur();const close=modal(`<h2>${fmtDate(date)} ${L}</h2>${d._byName?`<div class="muted" style="margin-bottom:8px">작성자: ${esc((d.writers||[]).join(', ')||d._byName)}</div>`:''}<div style="white-space:pre-wrap;word-break:break-word;line-height:1.7;font-size:15px;min-height:80px">${d[key]?esc(d[key]):'<span class="muted">기록된 내용이 없습니다.</span>'}</div><div class="row">${can?'<button class="btn ghost" id="nEdit">수정</button>':''}<button class="btn" data-close>닫기</button></div>`,(m,cl)=>{const e=$('#nEdit',m);if(e)e.onclick=async()=>{if(!(await pickActor()))return;cl();edit();};});};
     const edit=()=>{const d=cur();modal(`<h2>${fmtDate(date)} ${L} 수정</h2><textarea id="nV" class="in" style="width:100%;min-height:50vh;line-height:1.6;font-size:16px">${esc(d[key]||'')}</textarea><div class="muted" style="margin-top:6px">저장하면 수정 전 내용은 변경이력에 남습니다.</div><div class="row"><button class="btn ghost" id="nX">취소</button><button class="btn" id="nOk">저장</button></div>`,(m,cl)=>{const ta=$('#nV',m);setTimeout(()=>ta.focus(),80);$('#nX',m).onclick=()=>{cl();view();};
         $('#nOk',m).onclick=async()=>{const v=ta.value.trim()===''?null:ta.value;DB.endSession();Saver.put(sid,'daily_'+date,key,v);await Saver.flush(true);DB.endSession();cl();toast('저장했습니다.');};});};
     view();},
@@ -862,7 +875,7 @@ const Stock={
         <div class="muted" style="margin-top:6px">${edit?'날짜 칸에는 그날 매입 수량을, 재고조사 칸에는 그날 직접 센 수량을 적습니다. 사용 칸은 이달 사용 수량 합계입니다. ':''}장부재고 = 이월 + 매입계 - 사용. 재고조사는 한 달에 여러 번 할 수 있고, 차이는 가장 최근 조사 수량과 그날 장부재고의 차이입니다. 현재고 = 최근 조사 수량 + 그 뒤 매입 - 그 뒤 사용이며, 조사 기록이 없으면 장부재고입니다. 재고금액 = (단가 + 부가세) × 현재고.</div>`;}
     body.innerHTML=h+(edit&&!canCarry?'<div class="muted" style="margin-top:6px">이월 수량은 전월 재고에서 자동으로 넘어옵니다. 직접 고쳐야 하면 관리자 계정으로 수정해 주세요.</div>':'');
     this.bindCat(body);$$('[data-go]',body).forEach(r=>r.onclick=async()=>{await Saver.flush();S.date=r.dataset.go;S.stockView='entry';renderView();});
-    const ab=$('#addCnt',body);if(ab)tap(ab,async()=>{if(this.ym!==ymOf(today())){toast('이번 달 월간표에서만 추가할 수 있습니다. 오늘 버튼을 눌러 주세요.');return;}this.addCnt[this.ym+'|'+today().slice(8)]=1;this._focusCnt=today().slice(8);if(!S.edit){S.edit=true;renderView();}else{await Saver.flush();this.built=false;this.draw();}});
+    const ab=$('#addCnt',body);if(ab)tap(ab,async()=>{if(!(await pickActor()))return;if(this.ym!==ymOf(today())){toast('이번 달 월간표에서만 추가할 수 있습니다. 오늘 버튼을 눌러 주세요.');return;}this.addCnt[this.ym+'|'+today().slice(8)]=1;this._focusCnt=today().slice(8);if(!S.edit){S.edit=true;renderView();}else{await Saver.flush();this.built=false;this.draw();}});
     const toCol=el=>{const tw=el.closest('.tw');if(tw&&tw.classList.contains('xs')){const st=$('td.st',tw);tw.scrollLeft+=el.getBoundingClientRect().left-tw.getBoundingClientRect().left-(st?st.offsetWidth:0)-60;}};
     this.built=edit;if(!edit)return;
     setTimeout(()=>{const f=this._focusCnt&&$(`input[data-cd="${this._focusCnt}"]`,body);if(f){this._focusCnt=null;toCol(f);f.focus({preventScroll:true});}else if(!this._scrolledT){const t=$('td.tcol',body);if(t)toCol(t);}this._scrolledT=1;},120);
