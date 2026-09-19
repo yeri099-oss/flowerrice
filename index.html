@@ -202,6 +202,11 @@ table.mt td.n,table.mt thead tr:nth-child(2) th{width:58px;min-width:58px;max-wi
 table.mt td.n input,table.t td.n input.cell{width:100%;min-width:0;box-sizing:border-box;border:0;background:#fffdf3;text-align:right;padding:6px 3px;font:inherit;border-radius:0}
 table.t td.n input.cell:focus,table.mt td.n input:focus{outline:2px solid var(--acc);background:#fff}
 table.t td.ed{padding:0}
+
+.daywrap{max-width:500px;margin-inline:auto}
+.daywrap .grid{grid-template-columns:1fr 1fr}
+.daywrap .pairs{max-width:none}
+.vgrid>.f .ro{background:none;border:0;padding:2px 0 0;min-height:24px;font-size:16px;font-weight:600}
 </style></head>
 <body><div id="app"><div style="padding:40vh 0;text-align:center;color:#7a7166">불러오는 중…</div></div>
 <script src="firebase-config.js"></script>
@@ -654,7 +659,7 @@ const Log={
     const edit=S.edit;
     const pairSec=s=>s.fields.every(f=>f.ty==='pair'||f.ty==='calcpair');
     const pairHtml=s=>`<div class="pairs"><div></div><div class="ph">테이블</div><div class="ph">고객수</div>${s.fields.map(f=>{const v=fval(f,d)||[];const cell=i=>f.ty==='calcpair'?`<div class="ro" data-calc="${f.k}#${i?'G':'T'}">${v[i]==null?'-':won(v[i])}</div>`:edit?`<input inputmode="numeric" data-k="${f.k}${i?'G':'T'}" data-ty="int" value="${d[f.k+(i?'G':'T')]??''}">`:`<div class="pv">${v[i]==null?'-':won(v[i])}</div>`;return `<div class="pl">${esc(f.l)}</div>${cell(0)}${cell(1)}`;}).join('')}</div>`;
-    body.innerHTML=(edit?'':this.meta(d))+secs.map(s=>{const wide=s.fields.some(f=>f.full||['mid','workers','people','peopleMemo'].includes(f.ty));return `<div class="card"><h3>${esc(s.t)}${s.hint&&!pairSec(s)?`<span class="hint">${esc(s.hint)}</span>`:''}</h3>${pairSec(s)?pairHtml(s):`<div class="${wide?'':'grid'} ${edit?'':'vgrid'}" style="display:grid;gap:${edit?10:8}px">${s.fields.map(f=>this.fieldHtml(f,d,edit)).join('')}</div>`}</div>`;}).join('');
+    body.innerHTML='<div class="daywrap">'+(edit?'':this.meta(d))+secs.map(s=>{const wide=s.fields.some(f=>f.full||['mid','workers','people','peopleMemo'].includes(f.ty));return `<div class="card"><h3>${esc(s.t)}${s.hint&&!pairSec(s)?`<span class="hint">${esc(s.hint)}</span>`:''}</h3>${pairSec(s)?pairHtml(s):`<div class="${wide?'':'grid'} ${edit?'':'vgrid'}" style="display:grid;gap:${edit?10:8}px">${s.fields.map(f=>this.fieldHtml(f,d,edit)).join('')}</div>`}</div>`;}).join('')+'</div>';
     this.built=edit;
     if(!edit)return;
     $$('input[data-k],textarea[data-k]',body).forEach(el=>{const k=el.dataset.k,t=el.dataset.ty;
