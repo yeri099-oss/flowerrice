@@ -145,7 +145,7 @@ table.t tr.click:hover td{background:#fffbea}
 .pairs input{width:100%;border:1px solid var(--line);border-radius:9px;padding:9px 10px;text-align:right;background:#fff}
 .pairs .pv{text-align:right;font-weight:600;font-variant-numeric:tabular-nums;padding:6px 10px}
 .pairs .ro{min-height:0}
-@media(max-width:1024px){.tw{max-height:none!important;overflow-y:visible}table.t thead th{position:static}table.t thead th.st{position:sticky}}
+
 
 .items{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:10px}
 .items .item{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:#fffdf8;grid-template-columns:1fr auto;align-content:start}
@@ -167,6 +167,21 @@ table.lq td.nm2{font-weight:600;min-width:110px}
 table.lq td.z{color:#c9c1b3}
 
 .tw.fit{display:inline-block;max-width:100%;vertical-align:top}.tw.fit table{width:auto}table.lq th,table.lq td{padding:7px 12px}
+
+/* 표 안에 따로 스크롤을 두지 않는다: 화면 전체가 스크롤되고 표 머리글만 위쪽 메뉴 아래에 고정 */
+.tw{overflow:visible!important;max-height:none!important}
+table.t thead th{top:var(--hdr,0px)}
+.tw.xs{overflow-x:auto!important}
+.tw.xs table.t thead th{position:static}
+.tw.xs table.t thead th.st,.tw.xs table.t td.st{position:sticky;left:0}
+.tw.fit{display:block;width:fit-content;max-width:100%;margin-inline:auto}
+.modal{overscroll-behavior:contain;touch-action:none}.modal .box{overscroll-behavior:contain;touch-action:pan-y}
+/* 위쪽 메뉴 가운데 정렬 */
+.brand{display:grid;grid-template-columns:1fr auto 1fr;align-items:center}.brand h1{grid-column:2;text-align:center}.brand .who{grid-column:3;justify-self:end}
+.tabs::before,.tabs::after{content:"";flex:1}
+.subtabs{justify-content:center}
+.bar{justify-content:center}.bar .sp{display:none}
+#stBody>.muted,#logBody>.muted{text-align:center}
 </style></head>
 <body><div id="app"><div style="padding:40vh 0;text-align:center;color:#7a7166">불러오는 중…</div></div>
 <script src="firebase-config.js"></script>
@@ -195,7 +210,10 @@ const setPath=(o,k,v)=>{const ps=k.split('/');let c=o;for(let i=0;i<ps.length-1;
 const deepMerge=(t,s)=>{for(const k in s){const v=s[k];if(v&&typeof v==='object'&&!Array.isArray(v)&&!(v instanceof Date)){if(!t[k]||typeof t[k]!=='object'||Array.isArray(t[k]))t[k]={};deepMerge(t[k],v);}else t[k]=v;}return t;};
 const clone=o=>JSON.parse(JSON.stringify(o??null));
 function toast(m,ms=2200){document.querySelectorAll('.toast').forEach(x=>x.remove());const t=document.createElement('div');t.className='toast';t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),ms);}
-function modal(html,onMount){const m=document.createElement('div');m.className='modal';m.innerHTML=`<div class="box">${html}</div>`;m.addEventListener('mousedown',e=>{if(e.target===m)m.remove();});document.body.appendChild(m);const close=()=>m.remove();$$('[data-close]',m).forEach(b=>b.onclick=close);if(onMount)onMount(m,close);return close;}
+// 창: 닫기 버튼으로만 닫히고, 떠 있는 동안 뒤 화면은 스크롤되지 않는다
+let _lockY=0;function lockScroll(on){const b=document.body;if(on){if(b.dataset.lock)return;_lockY=scrollY;b.dataset.lock='1';b.style.position='fixed';b.style.top=(-_lockY)+'px';b.style.left='0';b.style.right='0';}
+  else{if(document.querySelector('.modal'))return;if(!b.dataset.lock)return;delete b.dataset.lock;b.style.position='';b.style.top='';b.style.left='';b.style.right='';scrollTo(0,_lockY);}}
+function modal(html,onMount){const m=document.createElement('div');m.className='modal';m.innerHTML=`<div class="box">${html}</div>`;lockScroll(true);document.body.appendChild(m);const close=()=>{m.remove();lockScroll(false);};$$('[data-close]',m).forEach(b=>b.onclick=close);if(onMount)onMount(m,close);return close;}
 function confirmBox(msg,okLabel='확인'){return new Promise(res=>{modal(`<h2>확인</h2><div style="white-space:pre-wrap">${esc(msg)}</div><div class="row"><button class="btn ghost" id="cN">취소</button><button class="btn" id="cY">${esc(okLabel)}</button></div>`,(m,close)=>{$('#cN',m).onclick=()=>{close();res(false);};$('#cY',m).onclick=()=>{close();res(true);};});});}
 // 1030 2000 -> 10:30~20:00
 function parseTimeRange(raw){
@@ -520,6 +538,9 @@ function weekRange(sid,d){const ws=STORES[sid]?STORES[sid].weekStart:1;const off
 // 숨은 오류가 나면 화면에 알려 준다 (원인 파악용)
 addEventListener('error',e=>{if(e&&e.message&&!/ResizeObserver|Script error/.test(e.message))toast('오류: '+e.message,5000);});
 addEventListener('unhandledrejection',e=>{const m=e&&e.reason&&(e.reason.message||e.reason.code||String(e.reason));if(m)toast('오류: '+m,5000);});
+// 표가 화면보다 넓을 때만 가로 스크롤을 켜고, 고정 머리글 위치를 위쪽 메뉴 높이에 맞춘다
+let _ftT=0;function fitTables(){const h=$('header.top');document.documentElement.style.setProperty('--hdr',(h?h.offsetHeight:0)+'px');$$('.tw').forEach(tw=>{const t=$('table',tw);if(!t)return;tw.classList.remove('xs');if(t.scrollWidth>tw.clientWidth+2)tw.classList.add('xs');});}
+new MutationObserver(()=>{clearTimeout(_ftT);_ftT=setTimeout(fitTables,40);}).observe(document.documentElement,{childList:true,subtree:true});addEventListener('resize',fitTables);
 async function boot(){
   try{await DB.init();}catch(e){root().innerHTML=`<div class="login card"><h2>연결 오류</h2><p>${esc(e.message)}</p></div>`;return;}
   if(DB.mode==='demo'){const b=document.createElement('div');b.className='demo';b.textContent='미리보기(데모) 모드 · Firebase 설정 전';document.body.prepend(b);}
@@ -759,7 +780,7 @@ ${!edit?`<div class="ins">${K.cols.map(c=>`<div><label>${c[1]}</label><div class
     const canCarry=S.edit&&(DB.me.role==='admin'||!this.prev);
     if(!K.price){ // 주류: 날짜가 행, 품목이 열
       const run={};list.forEach(it=>run[it.id]=this.carryOf(it.id));
-      h+=`<div class="tw"><table class="t"><thead><tr><th class="st" rowspan="2">날짜</th>${list.map(it=>`<th colspan="${K.cols.length+1}">${esc(it.name)}</th>`).join('')}</tr><tr>${list.map(()=>K.cols.map(c=>`<th style="top:31px">${c[1]}</th>`).join('')+'<th class="tot" style="top:31px">재고</th>').join('')}</tr></thead><tbody>
+      h+=`<div class="tw"><table class="t"><thead><tr><th class="st" rowspan="2">날짜</th>${list.map(it=>`<th colspan="${K.cols.length+1}">${esc(it.name)}</th>`).join('')}</tr><tr>${list.map(()=>K.cols.map(c=>`<th style="top:calc(var(--hdr,0px) + 31px)">${c[1]}</th>`).join('')+'<th class="tot" style="top:calc(var(--hdr,0px) + 31px)">재고</th>').join('')}</tr></thead><tbody>
       <tr><td class="st">전월이월</td>${list.map(it=>`<td colspan="${K.cols.length}"></td><td class="n tot">${canCarry?`<input data-k="carryM/${it.id}" value="${this.carryOf(it.id)}">`:won(this.carryOf(it.id))}</td>`).join('')}</tr>
       ${[...Array(n)].map((_,i)=>{const dd=pad(i+1),x=`${this.ym}-${dd}`;return `<tr class="click" data-go="${x}"><td class="st wk${dowOf(x)} ${x===td?'today':''}">${i+1}일 (${DOW[dowOf(x)]})</td>${list.map(it=>{const t=(d[dd]&&d[dd][it.id])||{};run[it.id]+=this.net(t);return K.cols.map(c=>`<td class="n">${t[c[0]]?won(t[c[0]]):''}</td>`).join('')+`<td class="n tot" ${run[it.id]<0?'style="color:var(--bad)"':''}>${won(run[it.id])}</td>`;}).join('')}</tr>`;}).join('')}
       <tr class="tot"><td class="st tot">합계</td>${list.map(it=>K.cols.map(c=>`<td class="n">${won((all[it.id]||{})[c[0]]||0)}</td>`).join('')+`<td class="n">${won(run[it.id])}</td>`).join('')}</tr></tbody></table></div>`;
@@ -1149,7 +1170,7 @@ const Importer={
   log(o,sid,ym,sheets){const res=XL.parse(sid,sheets,ym);
       const dates=Object.keys(res.days).sort();if(!dates.length){o.innerHTML='<div class="note bad">등록할 내용을 찾지 못했습니다. 사업장과 월이 파일과 맞는지 확인해 주세요.</div>';return;}
       const fs=allFields(sid).filter(f=>f.m&&f.ty!=='people');
-      o.innerHTML=`<div class="card"><h3>${STORES[sid].name} ${ym} · ${dates.length}일치 확인<span class="hint">${Object.keys(res.weeks).length?`주간 총평 ${Object.keys(res.weeks).length}건 포함`:''}</span></h3><div class="tw" style="max-height:50vh"><table class="t"><thead><tr><th class="st">날짜</th>${fs.map(f=>`<th>${esc(f.l)}</th>`).join('')}<th>작성자</th><th>특이사항</th></tr></thead><tbody>
+      o.innerHTML=`<div class="card"><h3>${STORES[sid].name} ${ym} · ${dates.length}일치 확인<span class="hint">${Object.keys(res.weeks).length?`주간 총평 ${Object.keys(res.weeks).length}건 포함`:''}</span></h3><div class="tw"><table class="t"><thead><tr><th class="st">날짜</th>${fs.map(f=>`<th>${esc(f.l)}</th>`).join('')}<th>작성자</th><th>특이사항</th></tr></thead><tbody>
         ${dates.map(d=>{const nested={};for(const k in res.days[d])setPath(nested,k,res.days[d][k]);return `<tr><td class="st">${fmtDate(d)}</td>${fs.map(f=>`<td class="n">${esc(ftext(f,nested))}</td>`).join('')}<td>${esc((nested.writers||[]).join(', '))}</td><td class="txt clip"><div style="max-height:40px">${esc((nested.notes||'').slice(0,60))}</div></td></tr>`;}).join('')}</tbody></table></div>
         <div class="row"><button class="btn acc" id="xDo">이대로 ${dates.length}일치 등록</button></div></div>`;
       $('#xDo',o).onclick=async()=>{const btn=$('#xDo',o);btn.disabled=true;let i=0;try{DB.endSession();for(const d of dates){btn.textContent=`등록 중… ${++i}/${dates.length}`;await DB.commit(sid,'daily_'+d,res.days[d],'엑셀 등록');}
