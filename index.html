@@ -194,6 +194,14 @@ tr.todayrow td:first-child{box-shadow:inset 3px 0 0 var(--acc),inset 0 2px 0 var
 
 td.golink{cursor:pointer;text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--line)}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+.vgrid>.f{border:1px solid var(--line);border-radius:10px;padding:8px 12px 6px;background:#fdfbf5;margin:0}
+.vgrid>.f label{margin-bottom:0}
+.vgrid>.f .val{padding:2px 0 0;font-size:16px}
+table.mt td.n,table.mt thead tr:nth-child(2) th{width:58px;min-width:58px;max-width:58px;box-sizing:border-box}
+table.mt td.n input,table.t td.n input.cell{width:100%;min-width:0;box-sizing:border-box;border:0;background:#fffdf3;text-align:right;padding:6px 3px;font:inherit;border-radius:0}
+table.t td.n input.cell:focus,table.mt td.n input:focus{outline:2px solid var(--acc);background:#fff}
+table.t td.ed{padding:0}
 </style></head>
 <body><div id="app"><div style="padding:40vh 0;text-align:center;color:#7a7166">불러오는 중…</div></div>
 <script src="firebase-config.js"></script>
@@ -528,6 +536,7 @@ function renderFloats(){const f=$('#floats');if(!f)return;if(!STORES[S.store]||!
   if(!S.edit){f.innerHTML=`<button class="btn acc fab" id="goEdit">✎ 기록하기</button>`;tap($('#goEdit'),async()=>{
       if(S.tab==='log'&&(S.view==='week'||S.view==='month')){const days=S.view==='week'?(()=>{const[a]=weekRange(S.store,S.date);return[...Array(7)].map((_,i)=>addDays(a,i));})():monthDays(ymOf(S.date));
         const d=await pickDay('어느 날짜를 기록할까요?',days,x=>{const dc=Log.docs&&Log.docs['daily_'+x];return dc&&Object.keys(dc).some(k=>!k.startsWith('_')&&k!=='writers');});if(!d)return;S.ret=S.view;S.date=d;S.view='day';}
+      else if(S.tab==='stock'&&S.stockView==='table'){/* 월간표는 그 자리에서 바로 입력 */}
       else if((S.tab==='stock'||S.tab==='chae')&&S.stockView!=='entry'&&S.stockView!=='memo'){const canCarry=DB.me.role==='admin'||!Stock.prev;
         const d=await pickDay('어느 날짜를 기록할까요?',monthDays(ymOf(S.date)),null,canCarry&&S.stockView==='table'?'<div style="margin-top:12px"><button class="btn ghost sm" id="pdExtra">날짜 대신 전월 이월 수량을 직접 수정</button></div>':'');if(!d)return;if(d!=='__extra'){S.ret2=S.stockView;S.date=d;S.stockView='entry';}}
       const stay=!S.ret&&!S.ret2;if(stay)keepPlace();S.edit=true;renderView();});}
@@ -580,7 +589,7 @@ function logSchema(sid){
     {t:'매출',fields:[{k:'total',l:'총 매출',ty:'money',m:1},{k:'net',l:'순매출',ty:'calc',m:1,fn:d=>has(d,'total')?num(d.total)-num(d.svc)-num(d.disc):null},
       {k:'card',l:'카드',ty:'calc',fn:d=>has(d,'total')?num(d.total)-num(d.svc)-num(d.disc)-num(d.cash):null},{k:'cash',l:'현금',ty:'money',m:1},{k:'svc',l:'서비스',ty:'money'},{k:'disc',l:'할인',ty:'money'}]},
     {t:'고객',hint:'테이블 ; 고객수',fields:[{k:'resv',l:'예약',ty:'pair'},{k:'walk',l:'워크인',ty:'pair'},{k:'tg',l:'합계',ty:'calcpair',m:1,fn:d=>has(d,'resvT','resvG','walkT','walkG')?[num(d.resvT)+num(d.walkT),num(d.resvG)+num(d.walkG)]:null}]},
-    {t:'고객서비스, 매장 특이사항',hint:'짬날 때 조금씩 적어도 자동 저장됩니다',fields:[{k:'notes',l:'고객서비스, 매장 특이사항',ty:'long',full:1}]},
+    {t:'고객서비스, 매장 특이사항',fields:[{k:'notes',l:'고객서비스, 매장 특이사항',ty:'long',full:1}]},
     {t:'운영',fields:[{k:'banchan',l:'반찬',ty:'text'},{k:'inbound',l:'업체별 입고상품',ty:'mid'}]},
     {t:'근무',fields:[{k:'helpers',l:'주방보조, 설거지',ty:'workers',src:'helper'},{k:'hourly',l:'시급직 근무',ty:'workers',src:'hourly'},{k:'staff',l:'금일 근무',ty:'people',src:'regular'},{k:'half',l:'금일 반근무',ty:'peopleMemo',src:'regular'},{k:'writers',l:'작성자',ty:'people',src:'all',m:1}]}];
   if(sid==='bojagi'){const vs=vendorsOf(sid).filter(v=>!v.off);const sales=['kiosk','posCard','posCash','delivery','svc','disc'];
@@ -592,13 +601,13 @@ function logSchema(sid){
     {t:'식사인원',fields:[{k:'kioskG',l:'키오스크 식사인원',ty:'int',m:1},{k:'posG',l:'포스 식사인원(배달포함)',ty:'int',m:1}]},
     {t:'매입',fields:[{k:'buyTotal',l:'총매입',ty:'calc',m:1,fn:d=>anyBuy(d)?inv(d)+crd(d):null},{k:'buyInv',l:'계산서매입',ty:'calc',fn:d=>anyBuy(d)?inv(d):null},
       ...vs.map(v=>({k:'ven/'+v.id,l:v.name,ty:'money'})),{k:'buyCard',l:'카드매입',ty:'calc',fn:d=>anyBuy(d)?crd(d):null},{k:'daiso',l:'다이소',ty:'money'},{k:'cardEtc',l:'기타(카드)',ty:'money'}]},
-    {t:'업무',fields:[{k:'tasks',l:'일일업무',ty:'mid',tall:1},{k:'order',l:'발주',ty:'text'},{k:'parcel',l:'택배입고',ty:'text'},{k:'clean',l:'청소진행',ty:'mid'}]},
-    {t:'특이사항',hint:'짬날 때 조금씩 적어도 자동 저장됩니다',fields:[{k:'notes',l:'특이사항',ty:'long',full:1}]},
+    {t:'업무',fields:[{k:'tasks',l:'일일업무',ty:'mid',tall:1,more:1},{k:'order',l:'발주',ty:'text'},{k:'parcel',l:'택배입고',ty:'text'},{k:'clean',l:'청소진행',ty:'mid'}]},
+    {t:'특이사항',fields:[{k:'notes',l:'특이사항',ty:'long',full:1}]},
     {t:'근무',fields:[{k:'hourly',l:'시급직 근무시간',ty:'workers',src:'part'},{k:'staff',l:'금일 근무',ty:'people',src:'regular'},{k:'half',l:'금일 반근무',ty:'peopleMemo',src:'regular'},{k:'writers',l:'작성자',ty:'people',src:'all',m:1}]}];}
   return[
     {t:'매출',fields:[{k:'total',l:'총 매출',ty:'money',m:1},{k:'net',l:'순매출',ty:'money',m:1},{k:'card',l:'카드',ty:'money'},{k:'cash',l:'현금',ty:'money'},{k:'disc',l:'할인',ty:'money'},{k:'point',l:'포인트',ty:'money'},{k:'credit',l:'외상',ty:'money',m:1}]},
     {t:'현금 관리',fields:[{k:'bankDep',l:'은행입금액',ty:'money'},{k:'float',l:'시재현금',ty:'money',nosum:1},{k:'cashSales',l:'당일매출현금',ty:'money'},{k:'balance',l:'현매장잔고',ty:'money',nosum:1},{k:'waste',l:'폐기',ty:'money'},{k:'adj',l:'마감 정산시 가감액',ty:'money'},{k:'floatChk',l:'시재확인',ty:'money',nosum:1}]},
-    {t:'특이사항',hint:'짬날 때 조금씩 적어도 자동 저장됩니다',fields:[{k:'notes',l:'특이사항',ty:'long',full:1}]},
+    {t:'특이사항',fields:[{k:'notes',l:'특이사항',ty:'long',full:1}]},
     {t:'근무',fields:[{k:'workers',l:'근무시간',ty:'workers',src:'all'},{k:'writers',l:'작성자',ty:'people',src:'all',m:1}]}];
 }
 const CHECKS={secs:[['am','점검항목 (오전)'],['pm','점검항목 (오후)'],['mg','점검항목 (관리자)']],items:['워크인/쇼케이스 온도확인 (0~10℃)','청소 (어느 곳이든 10분간)','유통기한 확인 (냉장 필수)','정육 유통기한 확인'],
@@ -645,7 +654,7 @@ const Log={
     const edit=S.edit;
     const pairSec=s=>s.fields.every(f=>f.ty==='pair'||f.ty==='calcpair');
     const pairHtml=s=>`<div class="pairs"><div></div><div class="ph">테이블</div><div class="ph">고객수</div>${s.fields.map(f=>{const v=fval(f,d)||[];const cell=i=>f.ty==='calcpair'?`<div class="ro" data-calc="${f.k}#${i?'G':'T'}">${v[i]==null?'-':won(v[i])}</div>`:edit?`<input inputmode="numeric" data-k="${f.k}${i?'G':'T'}" data-ty="int" value="${d[f.k+(i?'G':'T')]??''}">`:`<div class="pv">${v[i]==null?'-':won(v[i])}</div>`;return `<div class="pl">${esc(f.l)}</div>${cell(0)}${cell(1)}`;}).join('')}</div>`;
-    body.innerHTML=(edit?'':this.meta(d))+secs.map(s=>{const wide=s.fields.some(f=>f.full||['mid','workers','people','peopleMemo'].includes(f.ty));return `<div class="card"><h3>${esc(s.t)}${s.hint&&!pairSec(s)?`<span class="hint">${esc(s.hint)}</span>`:''}</h3>${pairSec(s)?pairHtml(s):`<div class="${wide?'':'grid'}" style="display:grid;gap:10px">${s.fields.map(f=>this.fieldHtml(f,d,edit)).join('')}</div>`}</div>`;}).join('');
+    body.innerHTML=(edit?'':this.meta(d))+secs.map(s=>{const wide=s.fields.some(f=>f.full||['mid','workers','people','peopleMemo'].includes(f.ty));return `<div class="card"><h3>${esc(s.t)}${s.hint&&!pairSec(s)?`<span class="hint">${esc(s.hint)}</span>`:''}</h3>${pairSec(s)?pairHtml(s):`<div class="${wide?'':'grid'} ${edit?'':'vgrid'}" style="display:grid;gap:${edit?10:8}px">${s.fields.map(f=>this.fieldHtml(f,d,edit)).join('')}</div>`}</div>`;}).join('');
     this.built=edit;
     if(!edit)return;
     $$('input[data-k],textarea[data-k]',body).forEach(el=>{const k=el.dataset.k,t=el.dataset.ty;
@@ -697,28 +706,28 @@ const Log={
     if(f.ty==='workers'){const h=list.reduce((s,d)=>s+(fval(f,d)||[]).reduce((x,p)=>x+hoursOf(p.t),0),0);return h?`${h}시간`:'';}
     return'';},
   drawWeek(a,docs,wk){const sid=this.sid,body=$('#logBody',this.v);if(document.activeElement&&document.activeElement.id==='wkRev')return;const days=[...Array(7)].map((_,i)=>addDays(a,i));const ds=days.map(x=>docs['daily_'+x]||{});const td=today();
-    const rows=logSchema(sid).map(s=>(s.fields.length===1&&s.fields[0].k==='notes'?'':`<tr><th class="st" colspan="9" style="background:#efe7d3">${esc(s.t)}</th></tr>`)+splitPairs(s.fields).map(f=>{const n=['money','int','calc','pnum'].includes(f.ty);const isN=f.k==='notes';
-      return `<tr><td class="st">${isN?'특이사항':esc(f.l)}</td>${ds.map((d,i)=>`<td ${isN?`data-note="${days[i]}" style="cursor:pointer"`:''} class="${n?'n':'txt clip'} ${days[i]===td?'today':''}"><div>${esc(ftext(f,d))}</div>${isN&&d.notes?'<div class="more">전체 보기</div>':''}</td>`).join('')}<td class="n tot">${this.sumCell(f,ds)}</td></tr>`;}).join('')).join('');
-    body.innerHTML=`<div class="muted" style="margin:4px 2px">날짜를 누르면 그날 일지로 이동하고, 특이사항 칸을 누르면 전체 내용이 창으로 뜹니다.</div><div class="tw"><table class="t"><thead><tr><th class="st">항목</th>${days.map(x=>`<th data-go="${x}" class="wk${dowOf(x)} ${x===td?'today':''}" style="cursor:pointer;min-width:104px">${+x.slice(5,7)}/${+x.slice(8)} (${DOW[dowOf(x)]})</th>`).join('')}<th class="tot">주간합계</th></tr></thead><tbody>${rows}</tbody></table></div>`+
+    const rows=logSchema(sid).map(s=>(s.fields.length===1&&s.fields[0].k==='notes'?'':`<tr><th class="st" colspan="9" style="background:#efe7d3">${esc(s.t)}</th></tr>`)+splitPairs(s.fields).map(f=>{const n=['money','int','calc','pnum'].includes(f.ty);const isN=f.k==='notes'||f.more;
+      return `<tr><td class="st">${f.k==='notes'?'특이사항':esc(f.l)}</td>${ds.map((d,i)=>`<td ${isN?`data-note="${days[i]}" data-nk="${f.k}" style="cursor:pointer"`:''} class="${n?'n':'txt clip'} ${days[i]===td?'today':''}"><div>${esc(ftext(f,d))}</div>${isN&&d[f.k]?'<div class="more">전체 보기</div>':''}</td>`).join('')}<td class="n tot">${this.sumCell(f,ds)}</td></tr>`;}).join('')).join('');
+    body.innerHTML=`<div class="muted" style="margin:4px 2px">날짜를 누르면 그날 일지로 이동하고, 특이사항${sid==='bojagi'?', 일일업무':''} 칸을 누르면 전체 내용이 창으로 뜹니다.</div><div class="tw"><table class="t"><thead><tr><th class="st">항목</th>${days.map(x=>`<th data-go="${x}" class="wk${dowOf(x)} ${x===td?'today':''}" style="cursor:pointer;min-width:104px">${+x.slice(5,7)}/${+x.slice(8)} (${DOW[dowOf(x)]})</th>`).join('')}<th class="tot">주간합계</th></tr></thead><tbody>${rows}</tbody></table></div>`+
       (sid==='market'?`<div class="card"><h3>주간 총평</h3>${canWrite(sid)?`<textarea class="in mid" id="wkRev" style="width:100%" placeholder="이번 주 총평">${esc(wk&&wk.review||'')}</textarea>`:`<div class="val">${esc(wk&&wk.review||'-')}</div>`}</div>`:'');
     $$('[data-go]',body).forEach(h=>h.onclick=()=>{S.date=h.dataset.go;S.view='day';renderView();});
     this.bindNotes(body);
     const wr=$('#wkRev',body);if(wr){wr.oninput=()=>Saver.put(sid,'week_'+a,'review',wr.value||null);wr.onblur=()=>Saver.flush();}
   },
-  drawMonth(docs){const sid=this.sid,body=$('#logBody',this.v);const ym=ymOf(S.date);const n=daysIn(ym);const fs=splitPairs(allFields(sid).filter(f=>f.m));const td=today();
+  drawMonth(docs){const sid=this.sid,body=$('#logBody',this.v);const ym=ymOf(S.date);const n=daysIn(ym);const fs=splitPairs(allFields(sid).filter(f=>f.m));const td=today();const mores=allFields(sid).filter(f=>f.more);const cells=[...mores,{k:'notes',l:'특이사항'}];
     const days=[...Array(n)].map((_,i)=>`${ym}-${pad(i+1)}`);const ds=days.map(x=>docs['daily_'+x]||{});
     const kp=fs.filter(f=>f.ty!=='people').slice(0,4);
     body.innerHTML=`<div class="kpis">${kp.map(f=>`<div class="kpi"><span>${esc(f.l)} 월 합계</span><b>${this.sumCell(f,ds)||'-'}</b></div>`).join('')}</div>
-    <div class="muted" style="margin:8px 2px">날짜를 누르면 그날 일지로 이동하고, 특이사항 칸을 누르면 전체 내용이 창으로 뜹니다.</div><div class="tw"><table class="t"><thead><tr><th class="st">날짜</th>${fs.map(f=>`<th>${esc(f.l)}</th>`).join('')}<th>특이사항</th></tr></thead><tbody>
-    ${days.map((x,i)=>`<tr><td data-go="${x}" style="cursor:pointer;text-decoration:underline" class="st wk${dowOf(x)} ${x===td?'today':''}">${+x.slice(8)}일 (${DOW[dowOf(x)]})</td>${fs.map(f=>`<td class="${f.ty==='people'?'':'n'}">${esc(ftext(f,ds[i]))}</td>`).join('')}<td class="txt clip" data-note="${x}" style="cursor:pointer"><div style="max-height:40px">${esc((ds[i].notes||'').slice(0,80))}</div>${ds[i].notes?'<div class="more">전체 보기</div>':''}</td></tr>`).join('')}
-    <tr class="tot"><td class="st tot">합계</td>${fs.map(f=>`<td class="n">${this.sumCell(f,ds)}</td>`).join('')}<td></td></tr></tbody></table></div>`;
+    <div class="muted" style="margin:8px 2px">날짜를 누르면 그날 일지로 이동하고, 특이사항${sid==='bojagi'?', 일일업무':''} 칸을 누르면 전체 내용이 창으로 뜹니다.</div><div class="tw"><table class="t"><thead><tr><th class="st">날짜</th>${fs.map(f=>`<th>${esc(f.l)}</th>`).join('')}${cells.map(f=>`<th>${esc(f.l)}</th>`).join('')}</tr></thead><tbody>
+    ${days.map((x,i)=>`<tr><td data-go="${x}" style="cursor:pointer;text-decoration:underline" class="st wk${dowOf(x)} ${x===td?'today':''}">${+x.slice(8)}일 (${DOW[dowOf(x)]})</td>${fs.map(f=>`<td class="${f.ty==='people'?'':'n'}">${esc(ftext(f,ds[i]))}</td>`).join('')}${cells.map(f=>`<td class="txt clip" data-note="${x}" data-nk="${f.k}" style="cursor:pointer"><div style="max-height:40px">${esc(String(ds[i][f.k]||'').slice(0,80))}</div>${ds[i][f.k]?'<div class="more">전체 보기</div>':''}</td>`).join('')}</tr>`).join('')}
+    <tr class="tot"><td class="st tot">합계</td>${fs.map(f=>`<td class="n">${this.sumCell(f,ds)}</td>`).join('')}${cells.map(()=>'<td></td>').join('')}</tr></tbody></table></div>`;
     $$('[data-go]',body).forEach(h=>h.onclick=()=>{S.date=h.dataset.go;S.view='day';renderView();});this.bindNotes(body);
   },
-  bindNotes(body){$$('[data-note]',body).forEach(c=>c.onclick=()=>this.noteModal(c.dataset.note));},
-  noteModal(date){const sid=this.sid;const cur=()=>((this.docs||{})['daily_'+date]||{});const can=canWrite(sid);
-    const view=()=>{const d=cur();const close=modal(`<h2>${fmtDate(date)} 특이사항</h2>${d._byName?`<div class="muted" style="margin-bottom:8px">작성자: ${esc((d.writers||[]).join(', ')||d._byName)}</div>`:''}<div style="white-space:pre-wrap;word-break:break-word;line-height:1.7;font-size:15px;min-height:80px">${d.notes?esc(d.notes):'<span class="muted">기록된 특이사항이 없습니다.</span>'}</div><div class="row">${can?'<button class="btn ghost" id="nEdit">수정</button>':''}<button class="btn" data-close>닫기</button></div>`,(m,cl)=>{const e=$('#nEdit',m);if(e)e.onclick=()=>{cl();edit();};});};
-    const edit=()=>{const d=cur();modal(`<h2>${fmtDate(date)} 특이사항 수정</h2><textarea id="nV" class="in" style="width:100%;min-height:50vh;line-height:1.6;font-size:16px">${esc(d.notes||'')}</textarea><div class="muted" style="margin-top:6px">저장하면 수정 전 내용은 변경이력에 남습니다.</div><div class="row"><button class="btn ghost" id="nX">취소</button><button class="btn" id="nOk">저장</button></div>`,(m,cl)=>{const ta=$('#nV',m);setTimeout(()=>ta.focus(),80);$('#nX',m).onclick=()=>{cl();view();};
-        $('#nOk',m).onclick=async()=>{const v=ta.value.trim()===''?null:ta.value;DB.endSession();Saver.put(sid,'daily_'+date,'notes',v);await Saver.flush(true);DB.endSession();cl();toast('저장했습니다.');};});};
+  bindNotes(body){$$('[data-note]',body).forEach(c=>c.onclick=()=>this.noteModal(c.dataset.note,c.dataset.nk||'notes'));},
+  noteModal(date,key='notes'){const sid=this.sid;const L=key==='notes'?'특이사항':((allFields(sid).find(f=>f.k===key)||{}).l||key);const cur=()=>((this.docs||{})['daily_'+date]||{});const can=canWrite(sid);
+    const view=()=>{const d=cur();const close=modal(`<h2>${fmtDate(date)} ${L}</h2>${d._byName?`<div class="muted" style="margin-bottom:8px">작성자: ${esc((d.writers||[]).join(', ')||d._byName)}</div>`:''}<div style="white-space:pre-wrap;word-break:break-word;line-height:1.7;font-size:15px;min-height:80px">${d[key]?esc(d[key]):'<span class="muted">기록된 내용이 없습니다.</span>'}</div><div class="row">${can?'<button class="btn ghost" id="nEdit">수정</button>':''}<button class="btn" data-close>닫기</button></div>`,(m,cl)=>{const e=$('#nEdit',m);if(e)e.onclick=()=>{cl();edit();};});};
+    const edit=()=>{const d=cur();modal(`<h2>${fmtDate(date)} ${L} 수정</h2><textarea id="nV" class="in" style="width:100%;min-height:50vh;line-height:1.6;font-size:16px">${esc(d[key]||'')}</textarea><div class="muted" style="margin-top:6px">저장하면 수정 전 내용은 변경이력에 남습니다.</div><div class="row"><button class="btn ghost" id="nX">취소</button><button class="btn" id="nOk">저장</button></div>`,(m,cl)=>{const ta=$('#nV',m);setTimeout(()=>ta.focus(),80);$('#nX',m).onclick=()=>{cl();view();};
+        $('#nOk',m).onclick=async()=>{const v=ta.value.trim()===''?null:ta.value;DB.endSession();Saver.put(sid,'daily_'+date,key,v);await Saver.flush(true);DB.endSession();cl();toast('저장했습니다.');};});};
     view();},
   label(sid,key){if(key.startsWith('chk/')){const[,s,i]=key.split('/');const sec=CHECKS.secs.find(x=>x[0]===s);return `${sec?sec[1]:s} ${i}번`;}
     if(key==='review')return'주간 총평';const k=key.replace(/[TG]$/,m=>m);const fs=allFields(sid);let f=fs.find(f=>f.k===key);if(f)return f.l;
@@ -733,6 +742,9 @@ const KINDS={
   inv:{name:'재고조사표',cols:[['in','매입',1],['use','사용',-1]],price:true,count:true},
   chae:{name:'채개장 재고표',cols:[['prod','생산',1],...CHAE_CH.map(([k,l])=>[k,l,-1]),['keep','보존',-1]],price:false,single:true}
 };
+// 수량을 g으로 적는데 단가는 1kg, 100g 기준인 품목 (엑셀과 같은 방식으로 적어도 금액이 맞게 자동 환산)
+const AUTO_DIV=[[/돼지앞다리살/,'1kg',1000],[/한우 불고기\(설깃\)/,'100g',100]];
+function divOf(it){if(num(it.div)>0)return num(it.div);const r=AUTO_DIV.find(([re,sp])=>re.test(it.name||'')&&String(it.spec||'').replace(/\s/g,'').toLowerCase()===sp);return r?r[2]:1;}
 const STORE_KINDS={pida:['liquor'],bojagi:['inv'],market:['inv']};
 const DEMO_STOCK={liquor:{cats:[{id:'c1',name:'막걸리'},{id:'c2',name:'수제맥주'}],items:{a1:{name:'해창6도',cat:'c1',o:1},a2:{name:'해창9도',cat:'c1',o:2},a3:{name:'희양산',cat:'c1',o:3},a4:{name:'가들바이젠',cat:'c2',o:4}}},
   inv:{cats:[{id:'c1',name:'네니아'},{id:'c2',name:'우리농'}],items:{a1:{name:'사과즙',cat:'c1',spec:'100ml',price:550,vat:55,o:1},a2:{name:'조청',cat:'c1',spec:'3kg',price:16910,vat:1691,o:2},a3:{name:'콩나물',cat:'c2',spec:'1kg',price:3050,vat:0,o:3}}}};
@@ -748,12 +760,11 @@ const Stock={
     bindDateNav(v,S.stockView==='entry'?'day':'month',()=>renderView());
     const ym=ymOf(S.date);this.ym=ym;this.docId=`${kind}_${ym}`;const coll=`stores/${sid}/data`;
     const hb=$('#sHist',v);if(hb)hb.onclick=()=>Hist.openDoc(sid,this.docId);
-    this.cfg=null;this.doc=null;this.prev=undefined;this.built=false;
+    this.cfg=null;this.doc=null;this.prev=undefined;this.built=false;if(this._qk!==sid+kind){this.q='';this._qk=sid+kind;}
     if(S.stockView==='memo'){_viewUnsubs.push(DB.watch(`${coll}/vendormemo`,d=>{this.memo=d||{};const q=Saver.q[sid+'|vendormemo'];if(q)for(const k in q.ch)setPath(this.memo,k,q.ch[k]);this.drawMemo();}));return;}
     const ready=()=>{if(this.cfg&&this.doc&&this.prev!==undefined)this.draw();};
     if(K.single){this.cfg={cats:[{id:'c',name:'채개장'}],items:{chae:{name:'채개장',cat:'c',o:1}}};}
     else _viewUnsubs.push(DB.watch(`stores/${sid}/config/${kind}`,d=>{this.cfg=d||(DB.mode==='demo'?DEMO_STOCK[kind]:{cats:[],items:{}});ready();}));
-    this.units={};if(K.price)_viewUnsubs.push(DB.watch(`${coll}/unitcfg`,u=>{this.units=(u&&u.div)||{};const q=Saver.q[sid+'|unitcfg'];if(q)for(const k in q.ch)this.units[k.split('/')[1]]=q.ch[k];if(this.cfg&&this.doc&&this.prev!==undefined){this.built=false;this.draw();}}));
     _viewUnsubs.push(DB.watch(`${coll}/${this.docId}`,d=>{this.doc=d||{};const q=Saver.q[sid+'|'+this.docId];if(q)for(const k in q.ch)setPath(this.doc,k,q.ch[k]);ready();}));
     _viewUnsubs.push(DB.watch(`${coll}/${kind}_${addMonth(ym,-1)}`,d=>{this.prev=d;ready();}));
   },
@@ -768,7 +779,7 @@ const Stock={
       if(canWrite(this.sid)&&!this._syncing){const ch={};items.forEach(it=>{const cur=this.doc.carry&&this.doc.carry[it.id];if(num(cur)!==this._prevEnd[it.id]||(cur==null&&this._prevEnd[it.id]!==0))ch['carry/'+it.id]=this._prevEnd[it.id];});
         if(Object.keys(ch).length){this._syncing=true;DB.commit(this.sid,this.docId,ch,'전월 재고 자동 이월').catch(console.error).finally(()=>setTimeout(()=>this._syncing=false,500));}}}
     return items;},
-  invRow(it,all){const sm=all[it.id]||{};const c=this.carryOf(it.id),inn=sm.in||0,use=sm.use||0,book=c+inn-use;const cv=this.doc.count&&this.doc.count[it.id];const count=cv==null?null:num(cv);const end=count==null?book:count;return{c,inn,use,book,count,end,diff:count==null?0:Math.round((count-book)*100)/100,p0:num(it.price)+num(it.vat),p:(num(it.price)+num(it.vat))/(num(this.units&&this.units[it.id])||1)};},
+  invRow(it,all){const sm=all[it.id]||{};const c=this.carryOf(it.id),inn=sm.in||0,use=sm.use||0,book=c+inn-use;const cv=this.doc.count&&this.doc.count[it.id];const count=cv==null?null:num(cv);const end=count==null?book:count;return{c,inn,use,book,count,end,diff:count==null?0:Math.round((count-book)*100)/100,p0:num(it.price)+num(it.vat),p:(num(it.price)+num(it.vat))/divOf(it)};},
   draw(){const items=this.prep();if(!items.length&&!this.K.single){$('#stBody',this.v).innerHTML=`<div class="card muted">등록된 품목이 없습니다. 관리자 화면의 품목 관리에서 품목을 등록하거나 초기 품목 파일을 불러와 주세요.</div>`;return;}
     if(this.K.single)return S.stockView==='table'?this.drawChaeTable():this.drawChaeEntry();
     if(S.stockView==='table')return this.drawTable(items);if(S.stockView==='sum')return this.drawSum(items);if(this.kind==='liquor')return this.drawLiquorEntry(items);this.drawEntry(items);},
@@ -783,46 +794,59 @@ const Stock={
     body.innerHTML=`<div class="muted" style="margin:6px 2px">${isToday?'오늘':fmtDate(S.date)} 기준입니다. 입고, 판매, 서비스만 적으면 재고는 자동 계산됩니다.</div><div class="fitwrap">${true?'<input class="in" id="stQ" placeholder="품목 검색" style="margin-bottom:8px;width:0;min-width:100%">':''}
       <div class="tw"><table class="t lq" style="width:auto"><thead><tr><th>분류</th><th style="text-align:left">품목</th>${K.cols.map(c=>`<th>${c[1]}</th>`).join('')}<th class="tot">재고</th></tr></thead><tbody>
       ${cats.map(({c,list})=>list.map((it,i)=>{const s=stockAt(it.id);const t=(this.doc.d&&this.doc.d[dd]&&this.doc.d[dd][it.id])||{};
-        return `<tr data-name="${esc(it.name)}">${i===0?`<td class="cat" rowspan="${list.length}">${esc(c.name)}</td>`:''}<td class="nm2">${esc(it.name)}</td>${K.cols.map(k=>edit?`<td class="n"><input inputmode="decimal" data-k="d/${dd}/${it.id}/${k[0]}" value="${t[k[0]]??''}"></td>`:`<td class="n ${t[k[0]]?'':'z'}">${t[k[0]]?won(t[k[0]]):'-'}</td>`).join('')}<td class="n tot" data-stk="${it.id}" style="font-size:15px;${s<0?'color:var(--bad)':''}">${won(s)}</td></tr>`;}).join('')).join('')}</tbody></table></div></div>`;
+        return `<tr data-name="${esc(it.name)}"><td class="cat ${i===0?'':'hide'}" data-rs="${i===0?list.length:0}" ${i===0?`rowspan="${list.length}"`:''}>${esc(c.name)}</td><td class="nm2">${esc(it.name)}</td>${K.cols.map(k=>edit?`<td class="n"><input inputmode="decimal" data-k="d/${dd}/${it.id}/${k[0]}" value="${t[k[0]]??''}"></td>`:`<td class="n ${t[k[0]]?'':'z'}">${t[k[0]]?won(t[k[0]]):'-'}</td>`).join('')}<td class="n tot" data-stk="${it.id}" style="font-size:15px;${s<0?'color:var(--bad)':''}">${won(s)}</td></tr>`;}).join('')).join('')}</tbody></table></div></div>`;
+    const q=$('#stQ',body);q.value=this.q||'';const filt=()=>{const v=(this.q=q.value.trim()).toLowerCase();$$('tbody tr',body).forEach(r=>{r.classList.toggle('hide',!!v&&!r.dataset.name.toLowerCase().includes(v));const c=$('td.cat',r);if(v){c.classList.remove('hide');c.rowSpan=1;}else{const n=+c.dataset.rs;c.classList.toggle('hide',!n);c.rowSpan=n||1;}});};q.oninput=filt;if(this.q)filt();
     this.built=edit;if(!edit)return;
     $$('input[data-k]',body).forEach(el=>{el.oninput=()=>{const n=numOrNull(el.value);if(n==null&&el.value.trim()!=='')return;this.put(el.dataset.k,n);this.drawLiquorEntry(items);};el.onblur=()=>Saver.flush();});
-    const q=$('#stQ',body);if(q)q.oninput=()=>{const v=q.value.trim();$$('tbody tr',body).forEach(r=>{r.style.opacity=!v||r.dataset.name.includes(v)?'':'.25';});};
   },
   drawEntry(items){const body=$('#stBody',this.v),K=this.K,dd=S.date.slice(8),day=+dd,edit=S.edit;
     const upto=this.sums(this.doc,day),all=this.sums(this.doc);const isToday=S.date===today();
     const stockAt=id=>this.carryOf(id)+this.net(upto[id]);
-    if(edit&&this.built){items.filter(i=>i.cat===S.cat).forEach(it=>{const el=$(`[data-stk="${it.id}"]`,body);if(el){const s=stockAt(it.id);el.firstChild.textContent=won(s);el.classList.toggle('neg',s<0);}});return;}
-    const cb=this.catBar();const list=items.filter(i=>i.cat===S.cat);const cat=(this.cfg.cats||[]).find(c=>c.id===S.cat)||{};
-    body.innerHTML=cb+`<div class="card"><h3>${esc(cat.name||'')}<span class="hint">${isToday?'오늘':fmtDate(S.date)} 기준 · ${K.cols.map(c=>c[1]).join(', ')}만 입력하면 재고는 자동 계산됩니다</span></h3>
-      ${true?'<input class="in" id="stQ" placeholder="품목 검색" style="margin-bottom:6px">':''}
-      <div class="items">${list.map(it=>{const s=stockAt(it.id);const t=(this.doc.d&&this.doc.d[dd]&&this.doc.d[dd][it.id])||{};
-        return `<div class="item" data-name="${esc(it.name)}"><div class="nm">${esc(it.name)}<small>${esc([it.spec,it.vendor,K.price&&num(this.units[it.id])>1?`수량은 단가 단위의 1/${this.units[it.id]}로 입력`:null].filter(Boolean).join(' · '))}</small></div>
+    if(edit&&this.built){$$('[data-stk]',body).forEach(el=>{const s=stockAt(el.dataset.stk);el.firstChild.textContent=won(s);el.classList.toggle('neg',s<0);});return;}
+    const catOf=id=>(this.cfg.cats||[]).find(c=>c.id===id)||{};
+    const itemHtml=(it,qv)=>{const cat=catOf(it.cat);const s=stockAt(it.id);const t=(this.doc.d&&this.doc.d[dd]&&this.doc.d[dd][it.id])||{};const cnt=this.doc.count&&this.doc.count[it.id];
+      return `<div class="item"><div class="nm">${esc(it.name)}<small>${esc([qv?cat.name:null,it.spec,it.vendor,K.price&&divOf(it)>1?'수량은 g으로 입력 (금액은 단가 기준에 맞춰 자동 환산)':null].filter(Boolean).join(' / '))}</small></div>
         <div class="stk ${s<0?'neg':''}" data-stk="${it.id}">${won(s)}<small>${isToday?'현재 재고':'이날 재고'}</small></div>
-${!edit?`<div class="ins">${K.cols.map(c=>`<div><label>${c[1]}</label><div class="v ${t[c[0]]?'':'z'}">${t[c[0]]?won(t[c[0]]):'-'}</div></div>`).join('')}${K.count?`<div><label>${cat.noPrice?'이달 수량':'월말 실사재고'}</label><div class="v ${this.doc.count&&this.doc.count[it.id]!=null?'':'z'}">${this.doc.count&&this.doc.count[it.id]!=null?won(this.doc.count[it.id]):'-'}</div></div>`:''}</div>`:''}
-        ${edit?`<div class="ins">${K.cols.map(c=>`<div><label>${c[1]}</label><input inputmode="decimal" data-k="d/${dd}/${it.id}/${c[0]}" value="${t[c[0]]??''}"></div>`).join('')}${K.count&&!cat.noPrice?`<div><label>월말 실사재고</label><input inputmode="decimal" data-k="count/${it.id}" value="${(this.doc.count&&this.doc.count[it.id])??''}"></div>`:''}${K.price&&!cat.noPrice?`<div><label>수량 단위</label><select data-unit="${it.id}" style="width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 4px;background:#fff"><option value="1">단가와 같은 단위</option><option value="100" ${num(this.units[it.id])===100?'selected':''}>g 입력, 단가는 100g 기준</option><option value="1000" ${num(this.units[it.id])===1000?'selected':''}>g(ml) 입력, 단가는 1kg(1L) 기준</option></select></div>`:''}${K.count&&cat.noPrice?`<div><label>이달 수량</label><input inputmode="decimal" data-k="count/${it.id}" value="${(this.doc.count&&this.doc.count[it.id])??''}"></div>`:''}</div>`:''}</div>`;}).join('')||'<div class="muted">이 분류에 품목이 없습니다.</div>'}</div></div>`;
-    this.bindCat(body);this.built=edit;if(!edit)return;
-    $$('input[data-k]',body).forEach(el=>{el.oninput=()=>{const n=numOrNull(el.value);if(n==null&&el.value.trim()!=='')return;this.put(el.dataset.k,n);this.drawEntry(items);};el.onblur=()=>Saver.flush();});
-    $$('[data-unit]',body).forEach(el=>el.onchange=()=>{const v=+el.value;Saver.put(this.sid,'unitcfg','div/'+el.dataset.unit,v>1?v:null);this.units[el.dataset.unit]=v>1?v:null;Saver.flush();toast('수량 단위를 저장했습니다. 매입금액과 재고금액이 이 단위로 계산됩니다.');});
-    const q=$('#stQ',body);if(q)q.oninput=()=>$$('.item',body).forEach(r=>r.classList.toggle('hide',!r.dataset.name.includes(q.value.trim())));
+        <div class="ins">${K.cols.map(c=>`<div><label>${c[1]}</label>${edit?`<input inputmode="decimal" data-k="d/${dd}/${it.id}/${c[0]}" value="${t[c[0]]??''}">`:`<div class="v ${t[c[0]]?'':'z'}">${t[c[0]]?won(t[c[0]]):'-'}</div>`}</div>`).join('')}${K.count?`<div><label>${cat.noPrice?'이달 수량':'월말 실사재고'}</label>${edit?`<input inputmode="decimal" data-k="count/${it.id}" value="${cnt??''}">`:`<div class="v ${cnt!=null?'':'z'}">${cnt!=null?won(cnt):'-'}</div>`}</div>`:''}</div></div>`;};
+    const fill=()=>{const qv=(this.q||'').toLowerCase();const list=qv?items.filter(i=>(i.name||'').toLowerCase().includes(qv)):items.filter(i=>i.cat===S.cat);
+      $('#stTitle',body).textContent=qv?`검색 결과 ${list.length}개 (전체 분류에서 찾음)`:(catOf(S.cat).name||'');
+      $('#stItems',body).innerHTML=list.map(it=>itemHtml(it,qv)).join('')||`<div class="muted">${qv?'찾는 품목이 없습니다.':'이 분류에 품목이 없습니다.'}</div>`;
+      if(edit)$$('#stItems input[data-k]',body).forEach(el=>{el.oninput=()=>{const n=numOrNull(el.value);if(n==null&&el.value.trim()!=='')return;this.put(el.dataset.k,n);this.drawEntry(items);};el.onblur=()=>Saver.flush();});};
+    body.innerHTML=this.catBar()+`<div class="card"><h3><span id="stTitle"></span><span class="hint">${isToday?'오늘':fmtDate(S.date)} 기준, ${K.cols.map(c=>c[1]).join(', ')}만 입력하면 재고는 자동 계산됩니다</span></h3>
+      <input class="in" id="stQ" placeholder="품목 검색 (전체 분류에서 찾습니다)" style="margin-bottom:6px"><div class="items" id="stItems"></div></div>`;
+    this.bindCat(body);const q=$('#stQ',body);q.value=this.q||'';q.oninput=()=>{this.q=q.value.trim();fill();};fill();this.built=edit;
   },
-  drawTable(items){const body=$('#stBody',this.v),K=this.K,n=daysIn(this.ym),td=today();let h=this.catBar();const list=items.filter(i=>i.cat===S.cat);const all=this.sums(this.doc);const d=this.doc.d||{};
-    const canCarry=S.edit&&(DB.me.role==='admin'||!this.prev);
-    if(!K.price){ // 주류: 날짜가 행, 품목이 열
-      const run={};list.forEach(it=>run[it.id]=this.carryOf(it.id));
-      h+=`<div class="tw"><table class="t"><thead><tr><th class="st" rowspan="2">날짜</th>${list.map(it=>`<th colspan="${K.cols.length+1}">${esc(it.name)}</th>`).join('')}</tr><tr>${list.map(()=>K.cols.map(c=>`<th style="top:calc(var(--hdr,0px) + 31px)">${c[1]}</th>`).join('')+'<th class="tot" style="top:calc(var(--hdr,0px) + 31px)">재고</th>').join('')}</tr></thead><tbody>
-      <tr><td class="st">전월이월</td>${list.map(it=>`<td colspan="${K.cols.length}"></td><td class="n tot">${canCarry?`<input data-k="carryM/${it.id}" value="${this.carryOf(it.id)}">`:won(this.carryOf(it.id))}</td>`).join('')}</tr>
-      ${[...Array(n)].map((_,i)=>{const dd=pad(i+1),x=`${this.ym}-${dd}`;return `<tr class="${x===td?'todayrow':''}"><td data-go="${x}" class="st golink wk${dowOf(x)} ${x===td?'today':''}">${i+1}일 (${DOW[dowOf(x)]})</td>${list.map(it=>{const t=(d[dd]&&d[dd][it.id])||{};run[it.id]+=this.net(t);return K.cols.map(c=>`<td class="n">${t[c[0]]?won(t[c[0]]):''}</td>`).join('')+`<td class="n tot" ${run[it.id]<0?'style="color:var(--bad)"':''}>${won(run[it.id])}</td>`;}).join('')}</tr>`;}).join('')}
-      <tr class="tot"><td class="st tot">합계</td>${list.map(it=>K.cols.map(c=>`<td class="n">${won((all[it.id]||{})[c[0]]||0)}</td>`).join('')+`<td class="n">${won(run[it.id])}</td>`).join('')}</tr></tbody></table></div>`;
-    }else{const cat=(this.cfg.cats||[]).find(c=>c.id===S.cat)||{};const days=[...Array(n)].map((_,i)=>pad(i+1)).filter(dd=>d[dd]&&list.some(it=>d[dd][it.id]&&d[dd][it.id].in));
-      let tb=0,ts=0;const np=cat.noPrice;const rows=list.map(it=>{const r=this.invRow(it,all);tb+=r.p*r.inn;ts+=r.p*r.end;
-        return `<tr><td class="st">${esc(it.name)}</td><td>${esc(it.spec||'')}</td>${np?'':`<td class="n">${won(it.price)}</td><td class="n">${won(it.vat)}</td><td class="n">${won(r.p0)}</td>`}${days.map(dd=>`<td class="n">${won((d[dd][it.id]||{}).in)||''}</td>`).join('')}<td class="n tot">${won(r.inn)}</td><td class="n">${canCarry?`<input data-k="carryM/${it.id}" value="${r.c}">`:won(r.c)}</td><td class="n">${won(r.use)}</td><td class="n tot" ${r.book<0?'style="color:var(--bad)"':''}>${won(r.book)}</td><td class="n">${r.count==null?'':won(r.count)}</td><td class="n" ${r.diff?'style="color:var(--bad);font-weight:700"':''}>${r.count==null?'':(r.diff>0?'+':'')+won(r.diff)}</td>${np?'':`<td class="n">${won(r.p*r.inn)}</td><td class="n tot">${won(r.p*r.end)}</td>`}</tr>`;}).join('');
-      h+=`<div class="tw"><table class="t"><thead><tr><th class="st">상품명</th><th>규격</th>${np?'':'<th>단가</th><th>부가세</th><th>포함가</th>'}${days.map(dd=>`<th>${+dd}일</th>`).join('')}<th class="tot">매입계</th><th>이월</th><th>사용</th><th class="tot">장부재고</th><th>실사재고</th><th>차이</th>${np?'':'<th>매입금액</th><th class="tot">재고금액</th>'}</tr></thead><tbody>${rows}
-        ${np?'':`<tr class="tot"><td class="st tot">합계</td><td colspan="${days.length+10}"></td><td class="n">${won(tb)}</td><td class="n">${won(ts)}</td></tr>`}</tbody></table></div>
-        <div class="muted" style="margin-top:6px">장부재고 = 이월 + 매입계 - 사용(직원이 기록한 수량 그대로). 월말에 실사재고를 넣어도 기록된 매입과 사용은 바뀌지 않고, 장부재고와의 차이만 따로 표시됩니다. 재고금액 = (단가 + 부가세) × 재고이며, 실사재고가 있으면 실사 수량으로, 없으면 장부재고로 계산합니다.</div>`;}
-    body.innerHTML=h+(S.edit&&!canCarry?'<div class="muted" style="margin-top:6px">이월 수량은 전월 재고에서 자동으로 넘어옵니다. 직접 고쳐야 하면 관리자 계정으로 수정해 주세요.</div>':'');
-    this.bindCat(body);$$('[data-go]',body).forEach(r=>r.onclick=e=>{S.date=r.dataset.go;S.stockView='entry';renderView();});
-    $$('input[data-k]',body).forEach(el=>{el.onclick=e=>e.stopPropagation();el.onchange=()=>{const v=numOrNull(el.value);this.put(el.dataset.k,v);Saver.flush();};});
+  // 월간표. 기록 모드에서는 엑셀처럼 칸에 바로 입력
+  drawTable(items){const body=$('#stBody',this.v),K=this.K,n=daysIn(this.ym),td=today(),edit=S.edit;const list=items.filter(i=>i.cat===S.cat||!(this.cfg.cats||[]).some(c=>c.id===S.cat));
+    if(edit&&this.built&&$('table.t',body)){this.refreshTable(list);return;}
+    let h=this.catBar();const list2=items.filter(i=>i.cat===S.cat);const all=this.sums(this.doc);const d=this.doc.d||{};
+    const canCarry=edit&&(DB.me.role==='admin'||!this.prev);const inp=(k,v)=>`<input class="cell" inputmode="decimal" data-k="${k}" value="${v??''}">`;
+    if(edit)h+=`<div class="muted" style="margin:4px 2px">칸에 바로 입력하면 자동 저장됩니다. Enter를 누르면 아래 칸으로 이동합니다.</div>`;
+    if(!K.price){const run={};list2.forEach(it=>run[it.id]=this.carryOf(it.id));
+      h+=`<div class="tw"><table class="t mt"><thead><tr><th class="st" rowspan="2">날짜</th>${list2.map(it=>`<th colspan="${K.cols.length+1}">${esc(it.name)}</th>`).join('')}</tr><tr>${list2.map(()=>K.cols.map(c=>`<th>${c[1]}</th>`).join('')+'<th class="tot">재고</th>').join('')}</tr></thead><tbody>
+      <tr><td class="st">전월이월</td>${list2.map(it=>`<td colspan="${K.cols.length}"></td><td class="n tot ${canCarry?'ed':''}">${canCarry?inp('carryM/'+it.id,this.carryOf(it.id)):won(this.carryOf(it.id))}</td>`).join('')}</tr>
+      ${[...Array(n)].map((_,i)=>{const dd=pad(i+1),x=`${this.ym}-${dd}`;return `<tr class="${x===td?'todayrow':''}"><td data-go="${x}" class="st golink wk${dowOf(x)} ${x===td?'today':''}">${i+1}일 (${DOW[dowOf(x)]})</td>${list2.map(it=>{const t=(d[dd]&&d[dd][it.id])||{};run[it.id]+=this.net(t);return K.cols.map(c=>edit?`<td class="n ed">${inp(`d/${dd}/${it.id}/${c[0]}`,t[c[0]])}</td>`:`<td class="n">${t[c[0]]?won(t[c[0]]):''}</td>`).join('')+`<td class="n tot" data-run="${it.id}/${dd}" ${run[it.id]<0?'style="color:var(--bad)"':''}>${won(run[it.id])}</td>`;}).join('')}</tr>`;}).join('')}
+      <tr class="tot"><td class="st tot">합계</td>${list2.map(it=>K.cols.map(c=>`<td class="n" data-sum="${it.id}/${c[0]}">${won((all[it.id]||{})[c[0]]||0)}</td>`).join('')+`<td class="n" data-run="${it.id}/end">${won(run[it.id])}</td>`).join('')}</tr></tbody></table></div>`;
+    }else{const cat=(this.cfg.cats||[]).find(c=>c.id===S.cat)||{};const days=edit?[...Array(n)].map((_,i)=>pad(i+1)):[...Array(n)].map((_,i)=>pad(i+1)).filter(dd=>d[dd]&&list2.some(it=>d[dd][it.id]&&d[dd][it.id].in));
+      let tb=0,ts=0;const np=cat.noPrice;const rows=list2.map(it=>{const r=this.invRow(it,all);tb+=r.p*r.inn;ts+=r.p*r.end;
+        return `<tr><td class="st">${esc(it.name)}</td><td>${esc(it.spec||'')}</td>${np?'':`<td class="n">${won(it.price)}</td><td class="n">${won(it.vat)}</td><td class="n">${won(r.p0)}</td>`}${days.map(dd=>edit?`<td class="n ed">${inp(`d/${dd}/${it.id}/in`,(d[dd]&&d[dd][it.id]||{}).in)}</td>`:`<td class="n">${won((d[dd][it.id]||{}).in)||''}</td>`).join('')}<td class="n tot" data-c="${it.id}/inn">${won(r.inn)}</td><td class="n ${canCarry?'ed':''}">${canCarry?inp('carryM/'+it.id,r.c):won(r.c)}</td><td class="n ${edit?'ed':''}">${edit?`<input class="cell" inputmode="decimal" data-use="${it.id}" value="${r.use||''}">`:won(r.use)}</td><td class="n tot" data-c="${it.id}/book" ${r.book<0?'style="color:var(--bad)"':''}>${won(r.book)}</td><td class="n ${edit?'ed':''}">${edit?inp('count/'+it.id,r.count):(r.count==null?'':won(r.count))}</td><td class="n" data-c="${it.id}/diff" ${r.diff?'style="color:var(--bad);font-weight:700"':''}>${r.count==null?'':(r.diff>0?'+':'')+won(r.diff)}</td>${np?'':`<td class="n" data-c="${it.id}/amtIn">${won(r.p*r.inn)}</td><td class="n tot" data-c="${it.id}/amtEnd">${won(r.p*r.end)}</td>`}</tr>`;}).join('');
+      h+=`<div class="tw"><table class="t ${edit?'mt':''}"><thead><tr><th class="st">상품명</th><th>규격</th>${np?'':'<th>단가</th><th>부가세</th><th>포함가</th>'}${days.map(dd=>`<th>${+dd}일</th>`).join('')}<th class="tot">매입계</th><th>이월</th><th>사용</th><th class="tot">장부재고</th><th>${np?'이달 수량':'실사재고'}</th><th>차이</th>${np?'':'<th>매입금액</th><th class="tot">재고금액</th>'}</tr></thead><tbody>${rows}
+        ${np?'':`<tr class="tot"><td class="st tot">합계</td><td colspan="${days.length+10}"></td><td class="n" data-c="tot/amtIn">${won(tb)}</td><td class="n" data-c="tot/amtEnd">${won(ts)}</td></tr>`}</tbody></table></div>
+        <div class="muted" style="margin-top:6px">${edit?'날짜 칸에는 그날 매입 수량을 적습니다. 사용 칸은 이달 사용 수량 합계입니다. ':''}장부재고 = 이월 + 매입계 - 사용(직원이 기록한 수량 그대로). 월말에 실사재고를 넣어도 기록된 매입과 사용은 바뀌지 않고, 장부재고와의 차이만 따로 표시됩니다. 재고금액 = (단가 + 부가세) × 재고이며, 실사재고가 있으면 실사 수량으로, 없으면 장부재고로 계산합니다.</div>`;}
+    body.innerHTML=h+(edit&&!canCarry?'<div class="muted" style="margin-top:6px">이월 수량은 전월 재고에서 자동으로 넘어옵니다. 직접 고쳐야 하면 관리자 계정으로 수정해 주세요.</div>':'');
+    this.bindCat(body);$$('[data-go]',body).forEach(r=>r.onclick=async()=>{await Saver.flush();S.date=r.dataset.go;S.stockView='entry';renderView();});
+    this.built=edit;if(!edit)return;
+    const cells=$$('input.cell',body);
+    cells.forEach(el=>{el.onfocus=()=>el.select();
+      el.oninput=()=>{const v=numOrNull(el.value);if(v==null&&el.value.trim()!=='')return;
+        if(el.dataset.use){const id=el.dataset.use,last=pad(n);const others=Object.keys(this.doc.d||{}).reduce((a,dd)=>a+(dd===last?0:num(((this.doc.d[dd]||{})[id]||{}).use)),0);this.put(`d/${last}/${id}/use`,v==null?null:Math.round((v-others)*1000)/1000);}
+        else this.put(el.dataset.k,v);this.refreshTable(list2);};
+      el.onblur=()=>Saver.flush();
+      el.onkeydown=e=>{if(e.key!=='Enter'&&e.key!=='ArrowDown'&&e.key!=='ArrowUp')return;e.preventDefault();const tdc=el.closest('td'),tr=tdc.parentElement,ix=[...tr.children].indexOf(tdc);let r=tr;for(;;){r=e.key==='ArrowUp'?r.previousElementSibling:r.nextElementSibling;if(!r)return;const c=r.children[ix]&&$('input',r.children[ix]);if(c){c.focus();return;}}};});
   },
+  refreshTable(list){const body=$('#stBody',this.v),K=this.K,n=daysIn(this.ym),all=this.sums(this.doc),d=this.doc.d||{};const set=(sel,txt,bad)=>{const el=$(sel,body);if(el){el.textContent=txt;el.style.color=bad?'var(--bad)':'';}};
+    if(!K.price){list.forEach(it=>{let run=this.carryOf(it.id);for(let i=1;i<=n;i++){const dd=pad(i);run+=this.net((d[dd]&&d[dd][it.id])||{});set(`[data-run="${it.id}/${dd}"]`,won(run),run<0);}set(`[data-run="${it.id}/end"]`,won(run));K.cols.forEach(c=>set(`[data-sum="${it.id}/${c[0]}"]`,won((all[it.id]||{})[c[0]]||0)));});return;}
+    let tb=0,ts=0;list.forEach(it=>{const r=this.invRow(it,all);tb+=r.p*r.inn;ts+=r.p*r.end;set(`[data-c="${it.id}/inn"]`,won(r.inn));set(`[data-c="${it.id}/book"]`,won(r.book),r.book<0);set(`[data-c="${it.id}/diff"]`,r.count==null?'':(r.diff>0?'+':'')+won(r.diff),!!r.diff);set(`[data-c="${it.id}/amtIn"]`,won(r.p*r.inn));set(`[data-c="${it.id}/amtEnd"]`,won(r.p*r.end));});set('[data-c="tot/amtIn"]',won(tb));set('[data-c="tot/amtEnd"]',won(ts));},
   drawSum(items){const body=$('#stBody',this.v);const all=this.sums(this.doc);let gb=0,gs=0;
     const rows=(this.cfg.cats||[]).filter(c=>!c.noPrice).map(c=>{let b=0,s=0;items.filter(i=>i.cat===c.id).forEach(it=>{const r=this.invRow(it,all);b+=r.p*r.inn;s+=r.p*r.end;});if(!c.noTotal){gb+=b;gs+=s;}
       return `<tr class="click" data-cat="${c.id}"><td class="st">${esc(c.name)}${c.noTotal?' <span class="tag">합계 제외</span>':''}</td><td class="n">${won(b)}</td><td class="n tot">${won(s)}</td></tr>`;}).join('');
@@ -1334,7 +1358,7 @@ const Xport={
     if(!sheets.length)throw new Error('등록된 품목이 없습니다.');XW.save(XW.book(T,sheets),`${STORES[sid].name}_${this.ymL(ym)} 주류재고.xlsx`);},
   // ---------- 재고조사표 ----------
   async inv(sid,ym){const coll=`stores/${sid}/data`;const y=ym.slice(0,4);const cfg=await this.cfgOf(sid,'inv');const year=await DB.getRange(coll,`inv_${y}-01`,`inv_${y}-12`);const doc=year['inv_'+ym]||{};const prev=+ym.slice(5)===1?await DB.get(`${coll}/inv_${addMonth(ym,-1)}`):(year['inv_'+addMonth(ym,-1)]||null);
-    const items=this.itemsOf(cfg);const uc=await DB.get(`${coll}/unitcfg`);const DIV=id=>num(uc&&uc.div&&uc.div[id])>1?num(uc.div[id]):1;const lg=this.ledger('inv',doc,prev,items.map(i=>i.id));const T=XTPL.inv;const n=daysIn(ym);const sheets=[];const totals=[];
+    const items=this.itemsOf(cfg);const _im={};items.forEach(i=>_im[i.id]=i);const DIV=id=>divOf(_im[id]||{});const lg=this.ledger('inv',doc,prev,items.map(i=>i.id));const T=XTPL.inv;const n=daysIn(ym);const sheets=[];const totals=[];
     for(const cat of(cfg.cats||[]).filter(c=>!c.noPrice)){const list=items.filter(i=>i.cat===cat.id);if(!list.length)continue;const tpl=T.sheets.cat;const m=XW.model(tpl);const hasV=list.some(i=>i.vendor);const o=hasV?1:0;
       const C=k=>XW.L(k+o);const tc=(r,k)=>{const c=tpl.rows[r].c[XW.L(k)];return c?c[0]:0;};
       const w=[];tpl.colw.forEach(([a,b,wd,s,h])=>{for(let k=a;k<=Math.min(b,45);k++)w[k]=[wd,s];});const cg=[];if(hasV)cg.push([1,1,12,w[1]&&w[1][1]]);for(let k=1;k<=45;k++)if(w[k])cg.push([k+o,k+o,w[k][0],w[k][1]]);cg.push([46+o,47+o,10.5,w[43]&&w[43][1]]);m.colGen=cg;
