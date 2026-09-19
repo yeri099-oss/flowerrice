@@ -170,9 +170,9 @@ table.lq td.z{color:#c9c1b3}
 
 /* 표 안에 따로 스크롤을 두지 않는다: 화면 전체가 스크롤되고 표 머리글만 위쪽 메뉴 아래에 고정 */
 .tw{overflow:visible!important;max-height:none!important}
-table.t thead th{top:var(--hdr,0px)}
+table.t thead th{top:var(--hdr2,0px)}
 .tw.xs{overflow-x:auto!important}
-.tw.xs table.t thead th{position:static}
+.tw.xs table.t thead th{position:relative;top:auto!important;z-index:5}
 .tw.xs table.t thead th.st,.tw.xs table.t td.st{position:sticky;left:0}
 .tw.fit{display:block;width:fit-content;max-width:100%;margin-inline:auto}
 .modal{overscroll-behavior:contain;touch-action:none}.modal .box{overscroll-behavior:contain;touch-action:pan-y}
@@ -182,6 +182,18 @@ table.t thead th{top:var(--hdr,0px)}
 .subtabs{justify-content:center}
 .bar{justify-content:center}.bar .sp{display:none}
 #stBody>.muted,#logBody>.muted{text-align:center}
+
+.fitwrap{width:fit-content;max-width:100%;margin-inline:auto}
+
+.bar.dbar{position:sticky;top:var(--hdr,0px);z-index:25;background:var(--bg);margin:0;padding:8px 0;border-bottom:1px solid var(--line)}
+@media(max-width:700px){header.top{position:static}body.typing .editbar{display:none}}
+tr.todayrow td{background:#fff4cf!important;box-shadow:inset 0 2px 0 var(--acc),inset 0 -2px 0 var(--acc)}
+tr.todayrow td:first-child{box-shadow:inset 3px 0 0 var(--acc),inset 0 2px 0 var(--acc),inset 0 -2px 0 var(--acc)}
+.modal .box{position:relative}
+.mx{position:sticky;top:0;float:right;margin:-6px -6px 0 8px;z-index:3;width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:#fff;font-size:15px;line-height:1;color:var(--ink);box-shadow:0 2px 6px rgba(0,0,0,.12)}
+
+td.golink{cursor:pointer;text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--line)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 </style></head>
 <body><div id="app"><div style="padding:40vh 0;text-align:center;color:#7a7166">불러오는 중…</div></div>
 <script src="firebase-config.js"></script>
@@ -213,7 +225,7 @@ function toast(m,ms=2200){document.querySelectorAll('.toast').forEach(x=>x.remov
 // 창: 닫기 버튼으로만 닫히고, 떠 있는 동안 뒤 화면은 스크롤되지 않는다
 let _lockY=0;function lockScroll(on){const b=document.body;if(on){if(b.dataset.lock)return;_lockY=scrollY;b.dataset.lock='1';b.style.position='fixed';b.style.top=(-_lockY)+'px';b.style.left='0';b.style.right='0';}
   else{if(document.querySelector('.modal'))return;if(!b.dataset.lock)return;delete b.dataset.lock;b.style.position='';b.style.top='';b.style.left='';b.style.right='';scrollTo(0,_lockY);}}
-function modal(html,onMount){const m=document.createElement('div');m.className='modal';m.innerHTML=`<div class="box">${html}</div>`;lockScroll(true);document.body.appendChild(m);const close=()=>{m.remove();lockScroll(false);};$$('[data-close]',m).forEach(b=>b.onclick=close);if(onMount)onMount(m,close);return close;}
+function modal(html,onMount){const m=document.createElement('div');m.className='modal';m.innerHTML=`<div class="box"><button type="button" class="mx" aria-label="닫기">✕</button>${html}</div>`;lockScroll(true);document.body.appendChild(m);const close=()=>{m.remove();lockScroll(false);};m.querySelector('.mx').onclick=()=>{const c=m.querySelector('#cN,#pdX');if(c)c.click();else close();};$$('[data-close]',m).forEach(b=>b.onclick=close);if(onMount)onMount(m,close);return close;}
 function confirmBox(msg,okLabel='확인'){return new Promise(res=>{modal(`<h2>확인</h2><div style="white-space:pre-wrap">${esc(msg)}</div><div class="row"><button class="btn ghost" id="cN">취소</button><button class="btn" id="cY">${esc(okLabel)}</button></div>`,(m,close)=>{$('#cN',m).onclick=()=>{close();res(false);};$('#cY',m).onclick=()=>{close();res(true);};});});}
 // 1030 2000 -> 10:30~20:00
 function parseTimeRange(raw){
@@ -526,11 +538,11 @@ function sumExpr(raw){const s=String(raw??'').replace(/[,\s]/g,'');if(s==='')ret
 function dateNav(unit){ // unit: day|week|month
   let label;if(unit==='month')label=S.date.slice(0,4)+'년 '+(+S.date.slice(5,7))+'월';
   else if(unit==='week'){const[a,b]=weekRange(S.store,S.date);label=`${+a.slice(5,7)}/${+a.slice(8)} ~ ${+b.slice(5,7)}/${+b.slice(8)}`;}else label=fmtDate(S.date);
-  return `<div class="datenav"><button class="ibtn" data-dn="-1">‹</button><b>${label}</b><button class="ibtn" data-dn="1">›</button><button class="ibtn" data-dn="0">오늘</button><label class="ibtn" style="position:relative;overflow:hidden">달력<input type="${unit==='month'?'month':'date'}" style="position:absolute;inset:0;opacity:0;width:100%;height:100%;border:0" value="${unit==='month'?ymOf(S.date):S.date}" data-dpick></div>`;
+  return `<div class="datenav" data-dbar><button class="ibtn" data-dn="-1">‹</button><b>${label}</b><button class="ibtn" data-dn="1">›</button><button class="ibtn" data-dn="0">오늘</button><label class="ibtn" style="position:relative;overflow:hidden">달력<input type="${unit==='month'?'month':'date'}" style="position:absolute;inset:0;opacity:0;width:100%;height:100%;border:0" value="${unit==='month'?ymOf(S.date):S.date}" data-dpick></div>`;
 }
 function bindDateNav(el,unit,cb){
   $$('[data-dn]',el).forEach(b=>b.onclick=async()=>{await Saver.flush();DB.endSession();const n=+b.dataset.dn;
-    if(n===0)S.date=today();else if(unit==='month'){const ym=addMonth(ymOf(S.date),n);S.date=ym+'-01';if(ym===ymOf(today()))S.date=today();}else S.date=addDays(S.date,n*(unit==='week'?7:1));cb();});
+    S.scrollToday=n===0;if(n===0)S.date=today();else if(unit==='month'){const ym=addMonth(ymOf(S.date),n);S.date=ym+'-01';if(ym===ymOf(today()))S.date=today();}else S.date=addDays(S.date,n*(unit==='week'?7:1));cb();});
   const p=$('[data-dpick]',el);if(p)p.onclick=()=>{try{p.showPicker();}catch(e){}};if(p)p.onchange=async()=>{if(!p.value)return;await Saver.flush();DB.endSession();S.date=unit==='month'?p.value+'-01':p.value;cb();};
 }
 function weekRange(sid,d){const ws=STORES[sid]?STORES[sid].weekStart:1;const off=(dowOf(d)-ws+7)%7;const a=addDays(d,-off);return[a,addDays(a,6)];}
@@ -539,8 +551,19 @@ function weekRange(sid,d){const ws=STORES[sid]?STORES[sid].weekStart:1;const off
 addEventListener('error',e=>{if(e&&e.message&&!/ResizeObserver|Script error/.test(e.message))toast('오류: '+e.message,5000);});
 addEventListener('unhandledrejection',e=>{const m=e&&e.reason&&(e.reason.message||e.reason.code||String(e.reason));if(m)toast('오류: '+m,5000);});
 // 표가 화면보다 넓을 때만 가로 스크롤을 켜고, 고정 머리글 위치를 위쪽 메뉴 높이에 맞춘다
-let _ftT=0;function fitTables(){const h=$('header.top');document.documentElement.style.setProperty('--hdr',(h?h.offsetHeight:0)+'px');$$('.tw').forEach(tw=>{const t=$('table',tw);if(!t)return;tw.classList.remove('xs');if(t.scrollWidth>tw.clientWidth+2)tw.classList.add('xs');});}
+let _ftT=0;function fitTables(){const h=$('header.top');const hs=h&&getComputedStyle(h).position==='sticky'?h.offsetHeight:0;const dn=$('#view [data-dbar]');const bar=dn&&dn.closest('.bar');if(bar)bar.classList.add('dbar');const R=document.documentElement;R.style.setProperty('--hdr',hs+'px');R.style.setProperty('--hdr2',(hs+(bar?bar.offsetHeight:0))+'px');
+  $$('.tw').forEach(tw=>{const t=$('table',tw);if(!t)return;tw.classList.remove('xs');if(t.scrollWidth>tw.clientWidth+2)tw.classList.add('xs');
+    const rows=t.tHead?t.tHead.rows:[];if(rows.length>1){const h1=rows[0].offsetHeight;[...rows[1].cells].forEach(c=>c.style.top=`calc(var(--hdr2,0px) + ${h1}px)`);}});
+  stickHeads();
+  if(S.scrollToday){const r=$('tr.todayrow');if(r){S.scrollToday=false;setTimeout(()=>{const y=r.getBoundingClientRect().top+scrollY-innerHeight/2;scrollTo({top:Math.max(0,y),behavior:'smooth'});},60);}}}
+// 옆으로 넓은 표는 가로 스크롤 때문에 머리글이 저절로 고정되지 않으므로, 스크롤에 맞춰 머리글을 따라 내려 준다
+function stickHeads(){const top=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hdr2'))||0;$$('.tw.xs').forEach(tw=>{const t=$('table',tw);if(!t||!t.tHead)return;const r=t.getBoundingClientRect();const hh=t.tHead.offsetHeight;const dy=Math.round(Math.max(0,Math.min(top-r.top,r.height-hh-36)));
+    if(t._dy===dy)return;t._dy=dy;$$('th',t.tHead).forEach(th=>{th.style.transform=dy?`translateY(${dy}px)`:'';});});}
+let _shR=0;addEventListener('scroll',()=>{if(_shR)return;_shR=requestAnimationFrame(()=>{_shR=0;stickHeads();});},{passive:true});
 new MutationObserver(()=>{clearTimeout(_ftT);_ftT=setTimeout(fitTables,40);}).observe(document.documentElement,{childList:true,subtree:true});addEventListener('resize',fitTables);
+// 휴대폰에서 이름 목록이 떠 있는 동안에는 아래 '기록 중 · 완료' 막대를 잠시 숨겨 화면을 넓게 쓴다
+addEventListener('focusin',e=>{if(e.target.matches&&e.target.matches('.sugwrap input'))document.body.classList.add('typing');});
+addEventListener('focusout',()=>setTimeout(()=>{const a=document.activeElement;if(!a||!a.matches||!a.matches('.sugwrap input'))document.body.classList.remove('typing');},200));
 async function boot(){
   try{await DB.init();}catch(e){root().innerHTML=`<div class="login card"><h2>연결 오류</h2><p>${esc(e.message)}</p></div>`;return;}
   if(DB.mode==='demo'){const b=document.createElement('div');b.className='demo';b.textContent='미리보기(데모) 모드 · Firebase 설정 전';document.body.prepend(b);}
@@ -645,13 +668,19 @@ const Log={
   chips(el,f){const sid=this.sid;const arr=()=>clone(getPath(this.doc,f.k))||[];const isObj=f.ty!=='people';const nm=x=>isObj?x.n:x;
     const save=a=>{this.put(f.k,a.length?a:null);Saver.flush();this.chips(el,f);};
     const detail=(i)=>{const a=arr();const p=a[i];const isT=f.ty==='workers';
-      modal(`<h2>${esc(p.n)}</h2><div class="f"><label>${isT?'근무시간 (숫자만 입력: 1030 2000)':'반근무 내용 (예: 대체반차, 오전, 오후북촌)'}</label><input id="dv" ${isT?'inputmode="numeric"':''} value="${esc(isT?(p.t||'').replace(/[:~]/g,m=>m==='~'?' ':''):(p.m||''))}"></div>${isT?'<div class="muted" id="dprev" style="margin-top:6px"></div>':''}<div class="row"><button class="btn bad" id="dDel">삭제</button><button class="btn" id="dOk">확인</button></div>`,(m,close)=>{const inp=$('#dv',m);const pv=()=>{if(isT)$('#dprev',m).textContent=inp.value?'→ '+parseTimeRange(inp.value):'';};inp.oninput=pv;pv();setTimeout(()=>inp.focus(),50);
-        const ok=()=>{if(isT)p.t=parseTimeRange(inp.value);else p.m=inp.value.trim();close();save(a);};$('#dOk',m).onclick=ok;inp.onkeydown=e=>{if(e.key==='Enter')ok();};$('#dDel',m).onclick=()=>{a.splice(i,1);close();save(a);};});};
+      if(isT){const pr=(p.t||'').split('~').map(x=>x.replace(/:/g,'').trim());
+        modal(`<h2>${esc(p.n)}</h2><div class="muted" style="margin-bottom:8px">숫자만 적으면 됩니다. 예: 1030, 2000</div><div class="grid2"><div class="f"><label>출근시간</label><input id="dv1" inputmode="numeric" maxlength="4" placeholder="1030" value="${esc(pr[0]||'')}"></div><div class="f"><label>퇴근시간</label><input id="dv2" inputmode="numeric" maxlength="4" placeholder="2000" value="${esc(pr[1]||'')}"></div></div><div class="muted" id="dprev" style="margin-top:6px;min-height:20px"></div><div class="row"><button class="btn bad" id="dDel">삭제</button><button class="btn" id="dOk">확인</button></div>`,(m,close)=>{const i1=$('#dv1',m),i2=$('#dv2',m);
+          const val=()=>{const x=i1.value.replace(/\D/g,''),y=i2.value.replace(/\D/g,'');return x||y?parseTimeRange((x+' '+y).trim()):'';};
+          const pv=()=>{const t=val();$('#dprev',m).textContent=t?'→ '+t:'';};
+          i1.oninput=()=>{pv();if(i1.value.replace(/\D/g,'').length>=4)i2.focus();};i2.oninput=pv;pv();setTimeout(()=>(i1.value?i2:i1).focus(),50);
+          const ok=()=>{p.t=val();close();save(a);};$('#dOk',m).onclick=ok;i1.onkeydown=e=>{if(e.key==='Enter')i2.focus();};i2.onkeydown=e=>{if(e.key==='Enter')ok();};$('#dDel',m).onclick=()=>{a.splice(i,1);close();save(a);};});return;}
+      modal(`<h2>${esc(p.n)}</h2><div class="f"><label>반근무 내용 (예: 대체반차, 오전, 오후북촌)</label><input id="dv" value="${esc(p.m||'')}"></div><div class="row"><button class="btn bad" id="dDel">삭제</button><button class="btn" id="dOk">확인</button></div>`,(m,close)=>{const inp=$('#dv',m);setTimeout(()=>inp.focus(),50);
+        const ok=()=>{p.m=inp.value.trim();close();save(a);};$('#dOk',m).onclick=ok;inp.onkeydown=e=>{if(e.key==='Enter')ok();};$('#dDel',m).onclick=()=>{a.splice(i,1);close();save(a);};});};
     const a0=arr();
     el.innerHTML=`<div class="chips">${a0.map((x,i)=>`<button type="button" class="chip" data-i="${i}">${esc(nm(x))}${isObj&&(x.t||x.m)?` <small>${esc(x.t||x.m)}</small>`:''}${isObj?'':' <span class="x">×</span>'}</button>`).join('')}<div class="sugwrap"><input class="in" placeholder="이름 입력 또는 선택 (여러 명 가능)" autocomplete="off"><div class="sug hide"></div></div></div>`;
     $$('.chip',el).forEach(c=>c.onclick=()=>{const i=+c.dataset.i;if(isObj)detail(i);else{const a=arr();a.splice(i,1);save(a);}});
     const inp=$('input',el),sg=$('.sug',el);const opts=namesFor(sid,f.src);
-    const add=n=>{n=n.trim();if(!n)return;const a=arr();if(a.some(x=>nm(x)===n)){inp.value='';sg.classList.add('hide');return;}a.push(isObj?{n}:n);this.put(f.k,a);Saver.flush();this.chips(el,f);if(isObj)detail(a.length-1);else setTimeout(()=>$('input',el).focus(),0);};
+    const add=n=>{n=n.trim();if(!n)return;const a=arr();if(a.some(x=>nm(x)===n)){inp.value='';sg.classList.add('hide');return;}a.push(isObj?{n}:n);this.put(f.k,a);Saver.flush();this.chips(el,f);if(isObj)detail(a.length-1);else if(innerWidth>700)setTimeout(()=>$('input',el).focus(),0);else document.body.classList.remove('typing');};
     const show=()=>{const q=inp.value.trim();const used=arr().map(nm);const list=opts.filter(o=>!used.includes(o)&&(!q||o.includes(q)));
       sg.innerHTML=list.map(o=>`<div data-n="${esc(o)}">${esc(o)}</div>`).join('')+(q&&!opts.includes(q)?`<div data-n="${esc(q)}">"${esc(q)}" 직접 추가</div>`:'');sg.classList.toggle('hide',!sg.innerHTML);
       $$('div',sg).forEach(o=>o.onmousedown=e=>{e.preventDefault();add(o.dataset.n);});};
@@ -751,10 +780,10 @@ const Stock={
   drawLiquorEntry(items){const body=$('#stBody',this.v),K=this.K,dd=S.date.slice(8),day=+dd,edit=S.edit;const upto=this.sums(this.doc,day);const stockAt=id=>this.carryOf(id)+this.net(upto[id]);
     if(edit&&this.built){items.forEach(it=>{const el=$(`[data-stk="${it.id}"]`,body);if(el){const s=stockAt(it.id);el.textContent=won(s);el.style.color=s<0?'var(--bad)':'';}});return;}
     const cats=(this.cfg.cats||[]).map(c=>({c,list:items.filter(i=>i.cat===c.id)})).filter(x=>x.list.length);const isToday=S.date===today();
-    body.innerHTML=`<div class="muted" style="margin:6px 2px">${isToday?'오늘':fmtDate(S.date)} 기준입니다. 입고, 판매, 서비스만 적으면 재고는 자동 계산됩니다.</div>${edit?'<input class="in" id="stQ" placeholder="품목 검색" style="margin-bottom:8px">':''}
-      <div class="tw fit"><table class="t lq"><thead><tr><th>분류</th><th style="text-align:left">품목</th>${K.cols.map(c=>`<th>${c[1]}</th>`).join('')}<th class="tot">재고</th></tr></thead><tbody>
+    body.innerHTML=`<div class="muted" style="margin:6px 2px">${isToday?'오늘':fmtDate(S.date)} 기준입니다. 입고, 판매, 서비스만 적으면 재고는 자동 계산됩니다.</div><div class="fitwrap">${true?'<input class="in" id="stQ" placeholder="품목 검색" style="margin-bottom:8px;width:0;min-width:100%">':''}
+      <div class="tw"><table class="t lq" style="width:auto"><thead><tr><th>분류</th><th style="text-align:left">품목</th>${K.cols.map(c=>`<th>${c[1]}</th>`).join('')}<th class="tot">재고</th></tr></thead><tbody>
       ${cats.map(({c,list})=>list.map((it,i)=>{const s=stockAt(it.id);const t=(this.doc.d&&this.doc.d[dd]&&this.doc.d[dd][it.id])||{};
-        return `<tr data-name="${esc(it.name)}">${i===0?`<td class="cat" rowspan="${list.length}">${esc(c.name)}</td>`:''}<td class="nm2">${esc(it.name)}</td>${K.cols.map(k=>edit?`<td class="n"><input inputmode="decimal" data-k="d/${dd}/${it.id}/${k[0]}" value="${t[k[0]]??''}"></td>`:`<td class="n ${t[k[0]]?'':'z'}">${t[k[0]]?won(t[k[0]]):'-'}</td>`).join('')}<td class="n tot" data-stk="${it.id}" style="font-size:15px;${s<0?'color:var(--bad)':''}">${won(s)}</td></tr>`;}).join('')).join('')}</tbody></table></div>`;
+        return `<tr data-name="${esc(it.name)}">${i===0?`<td class="cat" rowspan="${list.length}">${esc(c.name)}</td>`:''}<td class="nm2">${esc(it.name)}</td>${K.cols.map(k=>edit?`<td class="n"><input inputmode="decimal" data-k="d/${dd}/${it.id}/${k[0]}" value="${t[k[0]]??''}"></td>`:`<td class="n ${t[k[0]]?'':'z'}">${t[k[0]]?won(t[k[0]]):'-'}</td>`).join('')}<td class="n tot" data-stk="${it.id}" style="font-size:15px;${s<0?'color:var(--bad)':''}">${won(s)}</td></tr>`;}).join('')).join('')}</tbody></table></div></div>`;
     this.built=edit;if(!edit)return;
     $$('input[data-k]',body).forEach(el=>{el.oninput=()=>{const n=numOrNull(el.value);if(n==null&&el.value.trim()!=='')return;this.put(el.dataset.k,n);this.drawLiquorEntry(items);};el.onblur=()=>Saver.flush();});
     const q=$('#stQ',body);if(q)q.oninput=()=>{const v=q.value.trim();$$('tbody tr',body).forEach(r=>{r.style.opacity=!v||r.dataset.name.includes(v)?'':'.25';});};
@@ -765,7 +794,7 @@ const Stock={
     if(edit&&this.built){items.filter(i=>i.cat===S.cat).forEach(it=>{const el=$(`[data-stk="${it.id}"]`,body);if(el){const s=stockAt(it.id);el.firstChild.textContent=won(s);el.classList.toggle('neg',s<0);}});return;}
     const cb=this.catBar();const list=items.filter(i=>i.cat===S.cat);const cat=(this.cfg.cats||[]).find(c=>c.id===S.cat)||{};
     body.innerHTML=cb+`<div class="card"><h3>${esc(cat.name||'')}<span class="hint">${isToday?'오늘':fmtDate(S.date)} 기준 · ${K.cols.map(c=>c[1]).join(', ')}만 입력하면 재고는 자동 계산됩니다</span></h3>
-      ${edit?'<input class="in" id="stQ" placeholder="품목 검색" style="margin-bottom:6px">':''}
+      ${true?'<input class="in" id="stQ" placeholder="품목 검색" style="margin-bottom:6px">':''}
       <div class="items">${list.map(it=>{const s=stockAt(it.id);const t=(this.doc.d&&this.doc.d[dd]&&this.doc.d[dd][it.id])||{};
         return `<div class="item" data-name="${esc(it.name)}"><div class="nm">${esc(it.name)}<small>${esc([it.spec,it.vendor,K.price&&num(this.units[it.id])>1?`수량은 단가 단위의 1/${this.units[it.id]}로 입력`:null].filter(Boolean).join(' · '))}</small></div>
         <div class="stk ${s<0?'neg':''}" data-stk="${it.id}">${won(s)}<small>${isToday?'현재 재고':'이날 재고'}</small></div>
@@ -782,7 +811,7 @@ ${!edit?`<div class="ins">${K.cols.map(c=>`<div><label>${c[1]}</label><div class
       const run={};list.forEach(it=>run[it.id]=this.carryOf(it.id));
       h+=`<div class="tw"><table class="t"><thead><tr><th class="st" rowspan="2">날짜</th>${list.map(it=>`<th colspan="${K.cols.length+1}">${esc(it.name)}</th>`).join('')}</tr><tr>${list.map(()=>K.cols.map(c=>`<th style="top:calc(var(--hdr,0px) + 31px)">${c[1]}</th>`).join('')+'<th class="tot" style="top:calc(var(--hdr,0px) + 31px)">재고</th>').join('')}</tr></thead><tbody>
       <tr><td class="st">전월이월</td>${list.map(it=>`<td colspan="${K.cols.length}"></td><td class="n tot">${canCarry?`<input data-k="carryM/${it.id}" value="${this.carryOf(it.id)}">`:won(this.carryOf(it.id))}</td>`).join('')}</tr>
-      ${[...Array(n)].map((_,i)=>{const dd=pad(i+1),x=`${this.ym}-${dd}`;return `<tr class="click" data-go="${x}"><td class="st wk${dowOf(x)} ${x===td?'today':''}">${i+1}일 (${DOW[dowOf(x)]})</td>${list.map(it=>{const t=(d[dd]&&d[dd][it.id])||{};run[it.id]+=this.net(t);return K.cols.map(c=>`<td class="n">${t[c[0]]?won(t[c[0]]):''}</td>`).join('')+`<td class="n tot" ${run[it.id]<0?'style="color:var(--bad)"':''}>${won(run[it.id])}</td>`;}).join('')}</tr>`;}).join('')}
+      ${[...Array(n)].map((_,i)=>{const dd=pad(i+1),x=`${this.ym}-${dd}`;return `<tr class="${x===td?'todayrow':''}"><td data-go="${x}" class="st golink wk${dowOf(x)} ${x===td?'today':''}">${i+1}일 (${DOW[dowOf(x)]})</td>${list.map(it=>{const t=(d[dd]&&d[dd][it.id])||{};run[it.id]+=this.net(t);return K.cols.map(c=>`<td class="n">${t[c[0]]?won(t[c[0]]):''}</td>`).join('')+`<td class="n tot" ${run[it.id]<0?'style="color:var(--bad)"':''}>${won(run[it.id])}</td>`;}).join('')}</tr>`;}).join('')}
       <tr class="tot"><td class="st tot">합계</td>${list.map(it=>K.cols.map(c=>`<td class="n">${won((all[it.id]||{})[c[0]]||0)}</td>`).join('')+`<td class="n">${won(run[it.id])}</td>`).join('')}</tr></tbody></table></div>`;
     }else{const cat=(this.cfg.cats||[]).find(c=>c.id===S.cat)||{};const days=[...Array(n)].map((_,i)=>pad(i+1)).filter(dd=>d[dd]&&list.some(it=>d[dd][it.id]&&d[dd][it.id].in));
       let tb=0,ts=0;const np=cat.noPrice;const rows=list.map(it=>{const r=this.invRow(it,all);tb+=r.p*r.inn;ts+=r.p*r.end;
@@ -791,7 +820,7 @@ ${!edit?`<div class="ins">${K.cols.map(c=>`<div><label>${c[1]}</label><div class
         ${np?'':`<tr class="tot"><td class="st tot">합계</td><td colspan="${days.length+10}"></td><td class="n">${won(tb)}</td><td class="n">${won(ts)}</td></tr>`}</tbody></table></div>
         <div class="muted" style="margin-top:6px">장부재고 = 이월 + 매입계 - 사용(직원이 기록한 수량 그대로). 월말에 실사재고를 넣어도 기록된 매입과 사용은 바뀌지 않고, 장부재고와의 차이만 따로 표시됩니다. 재고금액 = (단가 + 부가세) × 재고이며, 실사재고가 있으면 실사 수량으로, 없으면 장부재고로 계산합니다.</div>`;}
     body.innerHTML=h+(S.edit&&!canCarry?'<div class="muted" style="margin-top:6px">이월 수량은 전월 재고에서 자동으로 넘어옵니다. 직접 고쳐야 하면 관리자 계정으로 수정해 주세요.</div>':'');
-    this.bindCat(body);$$('[data-go]',body).forEach(r=>r.onclick=e=>{if(e.target.tagName==='INPUT')return;S.date=r.dataset.go;S.stockView='entry';renderView();});
+    this.bindCat(body);$$('[data-go]',body).forEach(r=>r.onclick=e=>{S.date=r.dataset.go;S.stockView='entry';renderView();});
     $$('input[data-k]',body).forEach(el=>{el.onclick=e=>e.stopPropagation();el.onchange=()=>{const v=numOrNull(el.value);this.put(el.dataset.k,v);Saver.flush();};});
   },
   drawSum(items){const body=$('#stBody',this.v);const all=this.sums(this.doc);let gb=0,gs=0;
@@ -823,7 +852,7 @@ ${!edit?`<div class="ins">${K.cols.map(c=>`<div><label>${c[1]}</label><div class
   },
   drawChaeTable(){const body=$('#stBody',this.v),n=daysIn(this.ym),d=this.doc.d||{},td=today();let run=this.carryOf('chae');const tot={};const canCarry=S.edit&&(DB.me.role==='admin'||!this.prev);
     const rows=[...Array(n)].map((_,i)=>{const dd=pad(i+1),x=`${this.ym}-${dd}`,t=(d[dd]&&d[dd].chae)||{};const out=CHAE_CH.reduce((a,[k])=>a+num(t[k]),0);run+=num(t.prod)-out-num(t.keep);['prod','keep',...CHAE_CH.map(c=>c[0])].forEach(k=>tot[k]=(tot[k]||0)+num(t[k]));tot.out=(tot.out||0)+out;
-      return `<tr class="click" data-go="${x}"><td class="st wk${dowOf(x)} ${x===td?'today':''}">${i+1}일 (${DOW[dowOf(x)]})</td><td class="n">${t.prod?won(t.prod):''}</td><td class="n">${out?won(out):''}</td><td class="n">${t.keep?won(t.keep):''}</td><td class="n tot" ${run<0?'style="color:var(--bad)"':''}>${won(run)}</td>${CHAE_CH.map(([k])=>`<td class="n">${t[k]?won(t[k]):''}</td>`).join('')}</tr>`;}).join('');
+      return `<tr class="${x===td?'todayrow':''}"><td data-go="${x}" class="st golink wk${dowOf(x)} ${x===td?'today':''}">${i+1}일 (${DOW[dowOf(x)]})</td><td class="n">${t.prod?won(t.prod):''}</td><td class="n">${out?won(out):''}</td><td class="n">${t.keep?won(t.keep):''}</td><td class="n tot" ${run<0?'style="color:var(--bad)"':''}>${won(run)}</td>${CHAE_CH.map(([k])=>`<td class="n">${t[k]?won(t[k]):''}</td>`).join('')}</tr>`;}).join('');
     body.innerHTML=`<div class="tw"><table class="t"><thead><tr><th class="st">날짜</th><th>생산</th><th>출고</th><th>보존</th><th class="tot">재고</th>${CHAE_CH.map(c=>`<th>${c[1]}</th>`).join('')}</tr></thead><tbody>
       <tr><td class="st">전월이월</td><td colspan="3"></td><td class="n tot">${canCarry?`<input data-k="carryM/chae" value="${this.carryOf('chae')}">`:won(this.carryOf('chae'))}</td><td colspan="${CHAE_CH.length}"></td></tr>${rows}
       <tr class="tot"><td class="st tot">합계</td><td class="n">${won(tot.prod)}</td><td class="n">${won(tot.out)}</td><td class="n">${won(tot.keep)}</td><td class="n">${won(run)}</td>${CHAE_CH.map(([k])=>`<td class="n">${won(tot[k])}</td>`).join('')}</tr></tbody></table></div>`;
